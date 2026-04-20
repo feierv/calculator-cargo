@@ -57,6 +57,9 @@
 	var RAIL_EXTRA_USD_FIXED = 0;
 	/** Conversie finală (PASUL 8): 2300 × 0.92 = 2116 EUR. */
 	var RAIL_USD_TO_EUR = 0.92;
+	/** FOB feroviar (screenshot): USD×0.85, RON÷5.1 → EUR */
+	var RAIL_FOB_USD_TO_EUR = 0.85;
+	var RAIL_FOB_RON_PER_EUR = 5.1;
 	var USD_TO_EUR = 0.92; // aer + același factor pentru consistență afișaj
 	var RON_TO_EUR = 0.20; // 1 EUR ~ 5 RON
 	var SEA_MIN_SPRINTER_KG = 300;
@@ -366,7 +369,7 @@
 		return RAIL_PICKUP_USD_PER_CBM_DEFAULT;
 	}
 
-	function computeRailTransportPriceEur(weightRealKg, volumeM3, cnOriginCity, roDestCity) {
+	function computeRailTransportPriceEur(weightRealKg, volumeM3, cnOriginCity, roDestCity, incotermMode) {
 		var origin = (cnOriginCity || '').toString().trim();
 		if (!origin) return null;
 
@@ -380,6 +383,14 @@
 		var usdRailPerCbm = densityKgPerM3 < RAIL_SMILE_TIER_KG_PER_M3 ? pair.light : pair.heavy;
 
 		var railUsd = taxableCbm * usdRailPerCbm;
+		var inc = (incotermMode || 'exw').toString().toLowerCase();
+		if (inc === 'fob') {
+			var roadRonFob = getSeaRoadRon(w, roDestCity);
+			var railEurFob = railUsd * RAIL_FOB_USD_TO_EUR;
+			var roadEurFob = roadRonFob / RAIL_FOB_RON_PER_EUR;
+			return Math.round(railEurFob + roadEurFob);
+		}
+
 		var pickupUsd = taxableCbm * getRailPickupUsdPerCbm(origin);
 		var localUsd = taxableCbm * RAIL_LOCAL_USD_PER_CBM + RAIL_LOCAL_USD_FIXED;
 		var extraUsd = taxableCbm * RAIL_EXTRA_USD_PER_CBM + RAIL_EXTRA_USD_FIXED;
@@ -419,6 +430,45 @@
 		}
 		var btn = container.querySelector('.mpc-incoterm.mpc-active');
 		return (btn && btn.getAttribute('data-mode')) || 'exw';
+	}
+
+	/**
+	 * Regula curentă:
+	 * - EXW: doar Feroviar selectabil; Aerian + Maritim disabled.
+	 * - FOB: Aerian + Maritim + Feroviar selectabile.
+	 */
+	function applyTransportAvailabilityByIncoterm(container) {
+		var inc = getIncotermMode(container);
+		var isExw = inc === 'exw';
+
+		function setCardDisabled(card, disabled) {
+			if (!card) return;
+			var btn = card.querySelector('.mpc-btn-choose');
+			card.classList.toggle('mpc-result-card--disabled', disabled);
+			card.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+			if (btn) {
+				btn.disabled = disabled;
+				if (disabled) btn.textContent = 'Indisponibil';
+				else if (!card.classList.contains('mpc-result-card--selected')) btn.textContent = 'Alegeți';
+			}
+			if (disabled) {
+				card.classList.remove('mpc-result-card--selected');
+			}
+		}
+
+		var railCard = container.querySelector('.mpc-result-card--rail');
+		var airCard = container.querySelector('.mpc-result-card--air');
+		var seaCard = container.querySelector('.mpc-result-card--sea');
+
+		setCardDisabled(railCard, false);
+		setCardDisabled(airCard, false);
+		setCardDisabled(seaCard, isExw);
+
+		// Dacă era selectat un transport devenit indisponibil, curățăm selecția și totalul.
+		var selected = container.querySelector('.mpc-result-card--selected');
+		if (selected && selected.classList.contains('mpc-result-card--disabled')) {
+			resetTransportAndTotal(container);
+		}
 	}
 
 	function resetServiceSelections(container) {
@@ -1497,6 +1547,7 @@
 			var btn = card.querySelector('.mpc-btn-choose');
 			if (!btn) return;
 			btn.addEventListener('click', function () {
+				if (btn.disabled || card.classList.contains('mpc-result-card--disabled')) return;
 				container.querySelectorAll('.mpc-result-card').forEach(function (c) {
 					c.classList.remove('mpc-result-card--selected');
 					var b = c.querySelector('.mpc-btn-choose');
@@ -1712,6 +1763,7 @@
 					// La click pe INCOTERMS (FOB/EXW): revine sus și ascunde rezultatele (nu se afișează nimic mai jos)
 					var incotermGroup = container.querySelector('.mpc-toggle-group--incoterms');
 					if (group === incotermGroup && incotermGroup) {
+						applyTransportAvailabilityByIncoterm(container);
 						var resultsEl = container.querySelector('.mpc-results');
 						if (resultsEl) {
 							var wasVisible = !resultsEl.classList.contains('mpc-hidden');
@@ -1726,6 +1778,7 @@
 
 		// Cargo mode panels + add box + totals (live totals, add box, etc.)
 		initCargoPanels(container);
+		applyTransportAvailabilityByIncoterm(container);
 
 		// Total comandă: la click pe Alegeți actualizează caseta din dreapta
 		initTotalBox(container);
@@ -1949,7 +2002,8 @@
 								weightRealNum,
 								volNum,
 								originCityForCalc,
-								destCityForCalc
+								destCityForCalc,
+								incoterm
 							);
 							if (eurRail !== null && !isNaN(eurRail)) {
 								railCard.setAttribute('data-transport-price', eurRail);
@@ -1957,6 +2011,7 @@
 								if (railPriceEl) railPriceEl.textContent = eurRail + ' €';
 							}
 						}
+						applyTransportAvailabilityByIncoterm(container);
 
 						var seaCard = resultsEl.querySelector('.mpc-result-card--sea');
 						if (seaCard && typeof computeSeaTransportPriceEur === 'function') {

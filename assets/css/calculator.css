@@ -815,6 +815,12 @@
 	border-radius: var(--mpc-radius);
 	text-align: center;
 }
+.my-plugin-calculator .mpc-result-card--disabled {
+	opacity: 0.55;
+}
+.my-plugin-calculator .mpc-result-card--disabled .mpc-btn-choose {
+	cursor: not-allowed;
+}
 .my-plugin-calculator .mpc-result-card-badge {
 	position: absolute;
 	top: 0;

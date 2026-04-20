@@ -60,6 +60,12 @@
 	/** FOB feroviar (screenshot): USD×0.85, RON÷5.1 → EUR */
 	var RAIL_FOB_USD_TO_EUR = 0.85;
 	var RAIL_FOB_RON_PER_EUR = 5.1;
+	/** MARITIM EXW (screenshot): total China+maritim USD × 0.85; rutier RON ÷ 5.1 */
+	var SEA_EXW_USD_TO_EUR = 0.85;
+	var SEA_EXW_RON_PER_EUR = 5.1;
+	var SEA_EXW_LOCAL_CHARGE_USD_LT_40CBM = 150;
+	var SEA_EXW_LOCAL_CHARGE_USD_40PLUS_OR_12T = 280;
+	var SEA_EXW_LOCAL_CHARGE_WEIGHT_TON_THRESHOLD = 12;
 	var USD_TO_EUR = 0.92; // aer + același factor pentru consistență afișaj
 	var RON_TO_EUR = 0.20; // 1 EUR ~ 5 RON
 	var SEA_MIN_SPRINTER_KG = 300;
@@ -322,6 +328,29 @@
 		return road.sprinter || 0;
 	}
 
+	/** Pick-up China (USD/CBM) — tabel „Local WH Pick-up fee” (MARITIM EXW). */
+	function getSeaExwPickupUsdPerCbm(volumeM3) {
+		var v = Math.max(0, volumeM3 || 0);
+		if (v <= 0) return 0;
+		if (v <= 5) return 65;
+		if (v <= 10) return 75;
+		if (v <= 15) return 85;
+		if (v <= 20) return 95;
+		if (v <= 30) return 135;
+		if (v <= 35) return 165;
+		return 185;
+	}
+
+	/** Local charges China (USD flat) — tabel „LOCAL CHARGES” (MARITIM EXW). */
+	function getSeaExwLocalChargesUsd(volumeM3, weightKg) {
+		var v = Math.max(0, volumeM3 || 0);
+		var wTon = Math.max(0, weightKg || 0) / 1000;
+		if (v >= 40 || wTon >= SEA_EXW_LOCAL_CHARGE_WEIGHT_TON_THRESHOLD) {
+			return SEA_EXW_LOCAL_CHARGE_USD_40PLUS_OR_12T;
+		}
+		return SEA_EXW_LOCAL_CHARGE_USD_LT_40CBM;
+	}
+
 	function computeAirTransportPriceEur(chargeableKg, cnOriginCity, roDestCity) {
 		var origin = (cnOriginCity || '').toString().trim();
 		var truckRate = AIR_TRUCK_RATE_BY_CN_CITY[origin];
@@ -403,10 +432,13 @@
 	 * Estimator maritim LCL:
 	 * 1) WM taxabil = max(volume_m3, weight_kg / 1000)
 	 * 2) cost maritim USD = WM * tarif USD/WM din Sea.xlsx
-	 * 3) rutier RO (Constanța -> destinație) din FTL.xlsx, pe praguri de greutate
-	 * 4) total EUR = maritim(USD->EUR) + rutier(RON->EUR)
+	 * 3) EXW: + pick-up China (USD/CBM pe volum fizic) + local charges China (flat USD)
+	 * 4) rutier RO (Constanța -> destinație) din FTL.xlsx, pe praguri de greutate
+	 * 5) total EUR:
+	 *    - FOB: maritim USD×0.92 + rutier RON×RON_TO_EUR (comportament anterior)
+	 *    - EXW: (maritim+pickup+local) USD×0.85 + rutier RON÷5.1
 	 */
-	function computeSeaTransportPriceEur(weightRealKg, volumeM3, cnOriginCity, roDestCity) {
+	function computeSeaTransportPriceEur(weightRealKg, volumeM3, cnOriginCity, roDestCity, incotermMode) {
 		var seaRateUsdPerWm = getSeaUsdPerWm(cnOriginCity);
 		if (seaRateUsdPerWm == null) return null;
 
@@ -418,6 +450,15 @@
 
 		var seaUsd = wmTaxable * seaRateUsdPerWm;
 		var roadRon = getSeaRoadRon(weight, roDestCity);
+		var inc = (incotermMode || 'exw').toString().toLowerCase();
+		if (inc === 'exw') {
+			var pickupUsd = vol * getSeaExwPickupUsdPerCbm(vol);
+			var localUsd = getSeaExwLocalChargesUsd(vol, weight);
+			var totalChinaUsd = seaUsd + pickupUsd + localUsd;
+			var chinaEurExw = totalChinaUsd * SEA_EXW_USD_TO_EUR;
+			var roadEurExw = roadRon / SEA_EXW_RON_PER_EUR;
+			return Math.round(chinaEurExw + roadEurExw);
+		}
 		var seaEur = seaUsd * USD_TO_EUR;
 		var roadEur = roadRon * RON_TO_EUR;
 		return Math.round(seaEur + roadEur);
@@ -433,9 +474,8 @@
 	}
 
 	/**
-	 * Regula curentă:
-	 * - EXW: doar Feroviar selectabil; Aerian + Maritim disabled.
-	 * - FOB: Aerian + Maritim + Feroviar selectabile.
+	 * Regula curentă: toate cele 3 carduri (Aerian / Feroviar / Maritim) sunt selectabile
+	 * pe EXW și FOB; diferența EXW vs FOB este doar în formulele de calcul (JS).
 	 */
 	function applyTransportAvailabilityByIncoterm(container) {
 		var inc = getIncotermMode(container);
@@ -462,7 +502,7 @@
 
 		setCardDisabled(railCard, false);
 		setCardDisabled(airCard, false);
-		setCardDisabled(seaCard, isExw);
+		setCardDisabled(seaCard, false);
 
 		// Dacă era selectat un transport devenit indisponibil, curățăm selecția și totalul.
 		var selected = container.querySelector('.mpc-result-card--selected');
@@ -1499,7 +1539,10 @@
 			if (!card || !details || details.classList.contains('mpc-hidden')) return;
 			var transportPrice = parseFloat(card.getAttribute('data-transport-price') || '0', 10) || 0;
 			var inc = getIncotermMode(container);
-			var china = inc === 'exw' ? PRICE_CHINA_EXW : 0;
+			// MARITIM EXW include deja costurile locale din China în prețul cardului;
+			// evităm dublarea cu linia fixă „Servicii locale China (EXW)”.
+			var isSea = card.classList.contains('mpc-result-card--sea');
+			var china = inc === 'exw' && !isSea ? PRICE_CHINA_EXW : 0;
 			var extrasSum = 0;
 			if (moreEl) moreEl.innerHTML = '';
 			if (inc === 'exw' && china > 0 && moreEl) {
@@ -2019,7 +2062,8 @@
 								weightRealNum,
 								volNum,
 								originCityForCalc,
-								destCityForCalc
+								destCityForCalc,
+								incoterm
 							);
 							if (eurSea !== null && !isNaN(eurSea)) {
 								seaCard.setAttribute('data-transport-price', eurSea);

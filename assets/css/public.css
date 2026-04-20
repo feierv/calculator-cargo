@@ -1,0 +1,49 @@
+/**
+ * Frontend styles for My Plugin – Adresa încărcării
+ */
+
+.my-plugin-adresa-incarcarii {
+	max-width: 480px;
+	margin: 0 0 1.5rem;
+}
+
+.my-plugin-adresa-incarcarii__title {
+	margin: 0 0 1rem;
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: #2c3338;
+	line-height: 1.3;
+}
+
+.my-plugin-adresa-incarcarii__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+}
+
+.my-plugin-adresa-incarcarii__label {
+	display: block;
+	font-size: 0.875rem;
+	color: #646970;
+	line-height: 1.4;
+}
+
+.my-plugin-adresa-incarcarii__input {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	padding: 0.5rem 0.75rem;
+	font-size: 1rem;
+	line-height: 1.5;
+	color: #2c3338;
+	background-color: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-sizing: border-box;
+}
+
+.my-plugin-adresa-incarcarii__input:focus {
+	outline: none;
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculator grupaj China – Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #E76B38;
+      --primary-light: rgba(231, 107, 56, 0.12);
+      --primary-soft: rgba(231, 107, 56, 0.08);
+      --primary-border: rgba(231, 107, 56, 0.35);
+      --text: #1a1d21;
+      --text-muted: #5c6370;
+      --border: #e2e6eb;
+      --bg: #f5f6f8;
+      --white: #ffffff;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+      --shadow-soft: 0 8px 32px rgba(231, 107, 56, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem 1rem;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Subtle splashes – decorative blurred circles */
+    .splash {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .splash-1 {
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(231, 107, 56, 0.14) 0%, transparent 70%);
+      top: -120px;
+      right: -100px;
+    }
+    .splash-2 {
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(231, 107, 56, 0.1) 0%, transparent 70%);
+      bottom: 10%;
+      left: -80px;
+    }
+    .splash-3 {
+      width: 180px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(231, 107, 56, 0.08) 0%, transparent 70%);
+      top: 45%;
+      right: 15%;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    /* Progress steps */
+    .progress {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 2.5rem;
+      position: relative;
+    }
+    .progress::before {
+      content: '';
+      position: absolute;
+      top: 18px;
+      left: 40px;
+      right: 40px;
+      height: 2px;
+      background: var(--border);
+      z-index: 0;
+    }
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      max-width: 120px;
+      position: relative;
+      z-index: 1;
+    }
+    .step__circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.95rem;
+      background: var(--border);
+      color: var(--text-muted);
+      border: 2px solid transparent;
+    }
+    .step--active .step__circle {
+      background: var(--primary);
+      color: var(--white);
+      border-color: var(--primary);
+      box-shadow: 0 4px 14px rgba(231, 107, 56, 0.4);
+    }
+    .step__label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .step--active .step__label {
+      color: var(--primary);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .header h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.25;
+    }
+    .header p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* Two-column address section */
+    .address-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 600px) {
+      .address-row { grid-template-columns: 1fr; }
+    }
+    .section {
+      margin-bottom: 1.75rem;
+    }
+    .section-title {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .field {
+      margin-bottom: 1rem;
+    }
+    .field:last-child {
+      margin-bottom: 0;
+    }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .input {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--primary-light);
+      border: 1px solid var(--primary-border);
+      border-radius: var(--radius-sm);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+    .input--neutral {
+      background: var(--white);
+      border-color: var(--border);
+    }
+    .input--neutral:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+    .input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    /* Toggle group */
+    .toggle-group {
+      display: flex;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--white);
+    }
+    .toggle-group button {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      background: var(--white);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .toggle-group button:first-child {
+      border-right: 1px solid var(--border);
+    }
+    .toggle-group button.active {
+      background: var(--primary);
+      color: var(--white);
+    }
+    .toggle-group button:hover:not(.active) {
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    .params-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+    @media (max-width: 480px) {
+      .params-row { grid-template-columns: 1fr; }
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .help-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      color: var(--primary);
+      border: 1px solid var(--primary-border);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: help;
+    }
+
+    /* CTA button */
+    .submit-wrap {
+      margin-top: 2rem;
+      text-align: center;
+    }
+    .btn-calculate {
+      display: inline-block;
+      padding: 0.95rem 2.5rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--white);
+      background: var(--primary);
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(231, 107, 56, 0.35);
+      transition: transform 0.15s, box-shadow 0.2s;
+    }
+    .btn-calculate:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 28px rgba(231, 107, 56, 0.45);
+    }
+    .btn-calculate:active {
+      transform: translateY(0);
+    }
+
+    /* Transparent accent strip */
+    .accent-strip {
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      opacity: 0.5;
+      border-radius: 2px;
+      margin: 1.5rem 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash splash-1" aria-hidden="true"></div>
+  <div class="splash splash-2" aria-hidden="true"></div>
+  <div class="splash splash-3" aria-hidden="true"></div>
+
+  <div class="container">
+    <nav class="progress" aria-label="Pași formular">
+      <div class="step step--active">
+        <span class="step__circle">1</span>
+        <span class="step__label">Calculator</span>
+      </div>
+      <div class="step">
+        <span class="step__circle">2</span>
+        <span class="step__label">Detalii</span>
+      </div>
+      <div class="step">
+        <span class="step__circle">3</span>
+        <span class="step__label">Confirmare</span>
+      </div>
+      <div class="step">
+        <span class="step__circle">4</span>
+        <span class="step__label">Plata</span>
+      </div>
+    </nav>
+
+    <header class="header">
+      <h1>Calculați prețul transportului din China</h1>
+      <p>Livrăm marfa începând de la 200 kg sau 1 m³</p>
+    </header>
+
+    <div class="accent-strip"></div>
+
+    <div class="address-row">
+      <section class="section" aria-labelledby="title-loading">
+        <h2 id="title-loading" class="section-title">Adresa preluare</h2>
+        <div class="field">
+          <label for="loading-country">Alegeți țara</label>
+          <input type="text" id="loading-country" class="input" value="China" placeholder="Alegeți țara" />
+        </div>
+        <div class="field">
+          <label for="loading-city">Alegeți oraș</label>
+          <select id="loading-city" class="input input--neutral" autocomplete="off">
+            <option value="">Selectați orașul</option>
+          </select>
+        </div>
+      </section>
+      <section class="section" aria-labelledby="title-delivery">
+        <h2 id="title-delivery" class="section-title">Adresa livrare</h2>
+        <div class="field">
+          <label for="delivery-country">Alegeți țara</label>
+          <input type="text" id="delivery-country" class="input" value="Romania" placeholder="Alegeți țara" />
+        </div>
+        <div class="field">
+          <label for="delivery-city">Alegeți oraș</label>
+          <select id="delivery-city" class="input input--neutral" autocomplete="off">
+            <option value="">Selectați orașul</option>
+          </select>
+        </div>
+      </section>
+    </div>
+
+    <section class="section" aria-labelledby="title-cargo">
+      <h2 id="title-cargo" class="section-title">Introduceți volumul total și greutatea</h2>
+      <div class="params-row">
+        <div class="field">
+          <label for="volume">Volum total (mc3)</label>
+          <input type="text" id="volume" class="input input--neutral" placeholder="ex: 4.00" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="weight">Greutate (kg)</label>
+          <input type="text" id="weight" class="input input--neutral" placeholder="ex: 200" inputmode="numeric" />
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="title-incoterms">
+      <div class="section-header">
+        <h2 id="title-incoterms" class="section-title" style="margin-bottom: 0;">Alegeți condiții INCOTERMS</h2>
+        <span class="help-icon" title="Condiții de livrare internaționale">?</span>
+      </div>
+      <div class="toggle-group" role="group" aria-label="INCOTERMS">
+        <button type="button" class="toggle incoterm">FOB (Free On Board)</button>
+        <button type="button" class="toggle incoterm active">EXW (Ex Works)</button>
+      </div>
+    </section>
+
+    <div class="accent-strip"></div>
+
+    <div class="submit-wrap">
+      <button type="button" class="btn-calculate">Calculați</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      if (typeof fetch !== 'function') return;
+      var cnSel = document.getElementById('loading-city');
+      if (cnSel && cnSel.nodeName === 'SELECT' && cnSel.options.length <= 1) {
+        fetch('assets/data/cn-cities.json', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (cities) {
+            if (!Array.isArray(cities) || !cnSel) return;
+            cities.forEach(function (c) {
+              var o = document.createElement('option');
+              o.value = c;
+              o.textContent = c;
+              cnSel.appendChild(o);
+            });
+          })
+          .catch(function () {});
+      }
+      var roSel = document.getElementById('delivery-city');
+      if (roSel && roSel.nodeName === 'SELECT' && roSel.options.length <= 1) {
+        fetch('assets/data/ro-cities.json', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (cities) {
+            if (!Array.isArray(cities) || !roSel) return;
+            cities.forEach(function (c) {
+              var o = document.createElement('option');
+              o.value = c;
+              o.textContent = c;
+              roSel.appendChild(o);
+            });
+          })
+          .catch(function () {});
+      }
+    })();
+    document.querySelectorAll('.toggle-group').forEach(function(group) {
+      group.querySelectorAll('button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          group.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>

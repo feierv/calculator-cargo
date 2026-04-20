@@ -1,0 +1,84 @@
+/**
+ * My Plugin – admin styles (Settings page).
+ */
+.my-plugin-admin-layout {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2rem;
+	align-items: flex-start;
+	max-width: 1100px;
+}
+.my-plugin-admin-section {
+	flex: 1 1 320px;
+	min-width: 0;
+}
+.my-plugin-admin-section--upload {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 1rem 1.25rem;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+.my-plugin-admin-section--upload h2 {
+	margin-top: 0;
+}
+.my-plugin-admin-preview-badge {
+	display: inline-block;
+	margin-bottom: 0.75rem;
+	padding: 0.3rem 0.6rem;
+	border-radius: 999px;
+	background: #2271b1;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+.my-plugin-excel-form .my-plugin-file-input {
+	margin: 0.75rem 0 1rem;
+}
+.my-plugin-excel-meta {
+	margin-top: 1rem;
+	padding-top: 1rem;
+	border-top: 1px solid #dcdcde;
+	font-size: 13px;
+	color: #50575e;
+}
+.my-plugin-excel-meta code {
+	font-size: 12px;
+	word-break: break-all;
+}
+.my-plugin-admin-section--email-test {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	padding: 1rem 1.25rem;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	max-width: 640px;
+}
+.my-plugin-admin-section--email-test h2 {
+	margin-top: 0;
+}
+.my-plugin-test-mail-form {
+	margin-top: 0.75rem;
+}
+.my-plugin-test-mail-form input[type="email"] {
+	max-width: 100%;
+}
+.my-plugin-transport-files-wrap {
+	margin: 0.75rem 0 1rem;
+}
+.my-plugin-transport-files-table th,
+.my-plugin-transport-files-table td {
+	vertical-align: middle;
+}
+.my-plugin-transport-file-input {
+	max-width: 100%;
+}
+.my-plugin-transport-file-name {
+	display: inline-block;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: #50575e;
+}

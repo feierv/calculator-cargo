@@ -1,0 +1,19 @@
+<?php
+/**
+ * Copy this file to resend-local.php in the same folder and paste your Resend API key.
+ * resend-local.php is gitignored — do not commit secrets.
+ * If a key was ever exposed, revoke it in the Resend dashboard and create a new one.
+ *
+ * @package My_Plugin
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+if ( ! defined( 'MY_PLUGIN_RESEND_API_KEY' ) ) {
+	define( 'MY_PLUGIN_RESEND_API_KEY', 're_paste_new_key_here' );
+}
+
+// Opțional: expeditor (trebuie verificat în Resend pentru domeniul tău).
+// if ( ! defined( 'MY_PLUGIN_RESEND_FROM' ) ) {
+// define( 'MY_PLUGIN_RESEND_FROM', 'DVG Cargo <noreply@domeniul-tau.ro>' );
+// }

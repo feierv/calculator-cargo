@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculator grupaj China</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect fill='%23E76B38' width='32' height='32' rx='4'/></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/calculator.css">
+  <style>body{margin:0;min-height:100vh;background:#f5f6f8;}.mpc-preview-banner{font:14px/1.45 system-ui,sans-serif;background:#1d2327;color:#fff;padding:12px 16px;text-align:center}.mpc-preview-banner code{background:rgba(255,255,255,.12);padding:2px 6px;border-radius:4px}</style>
+</head>
+<body>
+  <p class="mpc-preview-banner" role="status">
+    <strong>Preview local.</strong>
+    În terminal: <code>cd</code> aici și rulează <code>php -S localhost:8080</code>, apoi deschide
+    <code>http://localhost:8080/calculator-preview.html</code> (nu <code>file://</code>).
+    Trimiterea folosește <code>dev-send-quote.php</code> + WordPress (calea se detectează sau o pui în <code>.wp-root-local.php</code>).
+    Pe producție folosește shortcode <code>[shipping_calculator]</code>.
+  </p>
+  <div class="my-plugin-calculator" id="mpc-preview">
+    <span class="mpc-splash mpc-splash-1" aria-hidden="true"></span>
+    <span class="mpc-splash mpc-splash-2" aria-hidden="true"></span>
+    <span class="mpc-splash mpc-splash-3" aria-hidden="true"></span>
+    <div class="mpc-layout">
+      <div class="mpc-inner">
+        <nav class="mpc-progress" aria-label="Pași">
+          <div class="mpc-step mpc-step--active" data-step="1"><span class="mpc-step__circle">1</span><span class="mpc-step__label">Calculator</span></div>
+          <div class="mpc-step" data-step="2"><span class="mpc-step__circle">2</span><span class="mpc-step__label">Detalii</span></div>
+          <div class="mpc-step" data-step="3"><span class="mpc-step__circle">3</span><span class="mpc-step__label">Confirmare</span></div>
+        </nav>
+        <div class="mpc-step1-panel">
+        <header class="mpc-header">
+          <h2 class="mpc-header__title">Calculați prețul transportului din China</h2>
+          <p>Livrăm marfa începând de la 200 kg sau 1 m³</p>
+        </header>
+        <div class="mpc-accent-strip"></div>
+        <div class="mpc-address-row">
+          <section class="mpc-section">
+            <h3 class="mpc-section-title">Adresa preluare</h3>
+            <div class="mpc-field"><label>Alegeți țara</label><input type="text" class="mpc-input" value="China" /></div>
+            <div class="mpc-field"><label>Alegeți oraș</label><select id="mpc-preview-loading-city" class="mpc-input mpc-input--neutral mpc-loading-city" autocomplete="off"><option value="">Selectați orașul</option></select></div>
+          </section>
+          <section class="mpc-section">
+            <h3 class="mpc-section-title">Adresa livrare</h3>
+            <div class="mpc-field"><label>Alegeți țara</label><input type="text" class="mpc-input" value="Romania" /></div>
+            <div class="mpc-field"><label>Alegeți oraș</label><select id="mpc-preview-delivery-city" class="mpc-input mpc-input--neutral mpc-delivery-city" autocomplete="off"><option value="">Selectați orașul</option></select></div>
+          </section>
+        </div>
+        <section class="mpc-section mpc-section--cargo">
+          <h3 class="mpc-section-title">Introduceți volumul total și greutatea</h3>
+          <div class="mpc-cargo-panel mpc-cargo-by-volume">
+            <div class="mpc-params-row">
+              <div class="mpc-field"><label>Volum total (mc3)</label><input type="text" class="mpc-input mpc-input--neutral mpc-input-volume" placeholder="4.00" /></div>
+              <div class="mpc-field"><label>Greutate (kg)</label><input type="text" class="mpc-input mpc-input--neutral mpc-input-weight" placeholder="200" /></div>
+            </div>
+          </div>
+        </section>
+        <section class="mpc-section">
+          <h3 class="mpc-section-title">INCOTERMS</h3>
+          <div class="mpc-toggle-group mpc-toggle-group--incoterms" role="group">
+            <button type="button" class="mpc-toggle mpc-incoterm" data-mode="fob">FOB</button>
+            <button type="button" class="mpc-toggle mpc-incoterm mpc-active" data-mode="exw">EXW</button>
+          </div>
+        </section>
+        <div class="mpc-accent-strip"></div>
+        <div class="mpc-submit-wrap">
+          <button type="button" class="mpc-btn-calculate">Calculați</button>
+          <div class="mpc-warnings mpc-hidden" role="alert"><ul class="mpc-warnings-list"></ul></div>
+        </div>
+        <div class="mpc-results mpc-hidden">
+          <div class="mpc-results-row">
+            <div class="mpc-results-left">
+              <div class="mpc-results-main">
+                <div class="mpc-results-volume">
+                  <p class="mpc-results-vol-main">Volum taxabil: <strong class="mpc-results-vol-value">1.00</strong> m³</p>
+                  <p class="mpc-results-vol-details">
+                    Volum fizic: <span class="mpc-results-phys-value">1.00</span> m³<br>
+                    Volum greutate: <span class="mpc-results-weight-vol-value">1.00</span> m³<br>
+                    Chargeable Weight (Aerian, IATA 1:6): <span class="mpc-results-air-weight-value">167</span> kg<br>
+                    Echivalent kg (300 kg/CBM, max V vs kg÷300): <span class="mpc-results-rail-weight-value">200</span> kg<br>
+                    CBM taxabil feroviar: <span class="mpc-results-rail-billable-cbm">1.00</span> m³
+                  </p>
+                </div>
+                <h3 class="mpc-results-transport-title">1. Transport Internațional (freight) China-România</h3>
+                <div class="mpc-results-cards">
+                  <div class="mpc-result-card mpc-result-card--air" data-transport-name="Aerian" data-transport-label="Transport Internațional (freight) China-România (Aerian)" data-transport-price="1500">
+                    <span class="mpc-result-card-icon" aria-hidden="true">✈️</span>
+                    <p class="mpc-result-card-name">Aerian</p>
+                    <p class="mpc-result-card-price">1500 €</p>
+                    <p class="mpc-result-card-delivery">Termen de livrare 7-12 de zile</p>
+                    <button type="button" class="mpc-btn-choose">Alegeți</button>
+                  </div>
+                  <div class="mpc-result-card mpc-result-card--rail" data-transport-name="Feroviar" data-transport-label="Transport Internațional (freight) China-România (Feroviar)" data-transport-price="365">
+                    <span class="mpc-result-card-icon" aria-hidden="true">🚂</span>
+                    <p class="mpc-result-card-name">Feroviar</p>
+                    <p class="mpc-result-card-price">365 €</p>
+                    <p class="mpc-result-card-delivery">Termen de livrare 25-35 de zile</p>
+                    <button type="button" class="mpc-btn-choose">Alegeți</button>
+                  </div>
+                  <div class="mpc-result-card mpc-result-card--sea" data-transport-name="Maritim" data-transport-label="Transport Internațional (freight) China-România (Maritim)" data-transport-price="158">
+                    <span class="mpc-result-card-icon" aria-hidden="true">🚢</span>
+                    <p class="mpc-result-card-name">Maritim</p>
+                    <p class="mpc-result-card-price">158 €</p>
+                    <p class="mpc-result-card-delivery">Termen de livrare 50-70 de zile</p>
+                    <button type="button" class="mpc-btn-choose">Alegeți</button>
+                  </div>
+                </div>
+                <div class="mpc-results-extras">
+                  <div class="mpc-results-section mpc-results-china">
+                    <h3 class="mpc-results-section-title">2. Servicii locale China (pentru EXW) <span class="mpc-help-icon" title="Informații">?</span></h3>
+                    <div class="mpc-service-item mpc-service-item--included">
+                      <span class="mpc-service-name">Servicii locale China <span class="mpc-service-check" aria-hidden="true">✓</span></span>
+                      <span class="mpc-service-price mpc-service-price--included">417 € INCLUS</span>
+                    </div>
+                  </div>
+                  <div class="mpc-results-section mpc-results-local">
+                    <h3 class="mpc-results-section-title"><span class="mpc-num-fob">2.</span><span class="mpc-num-exw">3.</span> Servicii locale România <span class="mpc-results-section-note">(TVA nu este inclus în preț)</span></h3>
+                    <div class="mpc-service-item mpc-service-item--toggle" data-service-id="door" data-service-price="76" data-service-label="Livrare door to door">
+                      <span class="mpc-service-name">Livrare door to door</span>
+                      <span class="mpc-service-price">76 €</span>
+                      <button type="button" class="mpc-btn-add-service">Adăugați</button>
+                    </div>
+                  </div>
+                  <div class="mpc-results-section mpc-results-optional mpc-hidden" data-mpc-rail-sea-extras="1">
+                    <h3 class="mpc-results-section-title"><span class="mpc-num-fob">3.</span><span class="mpc-num-exw">4.</span> Servicii aditionale</h3>
+                    <div class="mpc-service-item mpc-service-item--toggle mpc-service-item--disabled" data-service-id="portuare" data-service-price="700" data-service-label="Prestatii portuare">
+                      <span class="mpc-service-name">Prestatii portuare</span>
+                      <span class="mpc-service-price">700 €</span>
+                      <button type="button" class="mpc-btn-add-service" disabled>Adăugați</button>
+                    </div>
+                    <div class="mpc-service-item mpc-service-item--toggle" data-service-id="import" data-service-price="100" data-service-label="Declarația de import" data-hs-package-size="2" data-hs-package-price="100">
+                      <span class="mpc-service-name">Declarația de import</span>
+                      <span class="mpc-service-price">100 € / 2 coduri HS</span>
+                      <div class="mpc-import-hs-wrap">
+                        <label class="mpc-import-hs-label" for="mpc-preview-import-hs">Număr coduri HS</label>
+                        <input type="number" id="mpc-preview-import-hs" class="mpc-import-hs-count" min="2" step="2" value="2" inputmode="numeric" />
+                      </div>
+                      <button type="button" class="mpc-btn-add-service">Adăugați</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="mpc-results-actions mpc-results-actions--continue-only">
+                  <button type="button" class="mpc-btn-continue">Continuați comanda</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+        <div class="mpc-step2-panel mpc-hidden">
+          <button type="button" class="mpc-step2-back" aria-label="Înapoi">← Înapoi</button>
+          <h2 class="mpc-step2-title">Detalii ofertă</h2>
+          <div class="mpc-step2-summary">
+            <h3 class="mpc-step2-summary-title">Detalii ofertă</h3>
+            <dl class="mpc-summary-list">
+              <dt>Tip serviciu:</dt><dd class="mpc-summary-tip-serviciu">—</dd>
+              <dt>Volum total:</dt><dd class="mpc-summary-vol-total">—</dd>
+              <dt>Volum taxabil:</dt><dd class="mpc-summary-vol-taxabil">—</dd>
+              <dt>Greutate totală:</dt><dd class="mpc-summary-greutate">—</dd>
+              <dt>Condiții INCOTERMS:</dt><dd class="mpc-summary-incoterms">—</dd>
+              <dt>Adresa încărcării:</dt><dd class="mpc-summary-loading">—</dd>
+              <dt>Adresa livrării:</dt><dd class="mpc-summary-delivery">—</dd>
+            </dl>
+          </div>
+          <div class="mpc-step2-section">
+            <h3 class="mpc-step2-section-title">Introduceți datele de contact</h3>
+            <div class="mpc-step2-fields">
+              <div class="mpc-field"><label>Nume *</label><input type="text" class="mpc-input mpc-input--neutral mpc-contact-nume" required /></div>
+              <div class="mpc-field"><label>Prenume *</label><input type="text" class="mpc-input mpc-input--neutral mpc-contact-prenume" required /></div>
+              <div class="mpc-field"><label>Telefon *</label><input type="tel" class="mpc-input mpc-input--neutral mpc-contact-telefon" required /></div>
+              <div class="mpc-field"><label>Email *</label><input type="email" class="mpc-input mpc-input--neutral mpc-contact-email" required /></div>
+            </div>
+          </div>
+          <div class="mpc-step2-section">
+            <h3 class="mpc-step2-section-title">Introduceți adresa de livrare și datele companiei</h3>
+            <div class="mpc-delivery-panel mpc-delivery-panel--fizica mpc-hidden">
+              <div class="mpc-step2-fields mpc-step2-fields--two-cols">
+                <div class="mpc-field"><label>Județ</label><select class="mpc-input mpc-input--neutral mpc-delivery-judet-fizica"><option value="">Selectați județul</option></select></div>
+                <div class="mpc-field"><label>Localitate</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-localitate-fizica" placeholder="Localitate" /></div>
+                <div class="mpc-field mpc-field--full"><label>Adresa</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-adresa-fizica" placeholder="Adresa" /></div>
+                <div class="mpc-field"><label>Cod poștal</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-codpostal-fizica" placeholder="Cod poștal" /></div>
+              </div>
+            </div>
+            <div class="mpc-delivery-panel mpc-delivery-panel--juridica">
+              <div class="mpc-step2-fields mpc-step2-fields--two-cols">
+                <div class="mpc-field mpc-field--cui"><label>CUI</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-cui" placeholder="Introduceți CUI..." /><button type="button" class="mpc-btn-cui-fetch" aria-label="Preia date">↓</button></div>
+                <div class="mpc-field"><label>Companie</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-companie" placeholder="Companie" /></div>
+                <div class="mpc-field"><label>Județ</label><select class="mpc-input mpc-input--neutral mpc-delivery-judet"><option value="">Selectați județul</option></select></div>
+                <div class="mpc-field"><label>Localitate</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-localitate" placeholder="Localitate" /></div>
+                <div class="mpc-field mpc-field--full"><label>Adresa</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-adresa" placeholder="Adresa" /></div>
+                <div class="mpc-field"><label>Cod poștal</label><input type="text" class="mpc-input mpc-input--neutral mpc-delivery-codpostal" placeholder="Cod poștal" /></div>
+              </div>
+            </div>
+            <div class="mpc-field mpc-field--checkbox">
+              <label><input type="checkbox" class="mpc-delivery-facturare-diferita" /> Doresc adresă de facturare diferită</label>
+            </div>
+            <div class="mpc-billing-wrap mpc-hidden">
+              <div class="mpc-billing-inner">
+                <h3 class="mpc-step2-section-title">Introduceți adresa de facturare</h3>
+                <div class="mpc-delivery-panel mpc-billing-panel--fizica mpc-hidden">
+                  <div class="mpc-step2-fields mpc-step2-fields--two-cols">
+                    <div class="mpc-field"><label>Județ</label><select class="mpc-input mpc-input--neutral mpc-billing-judet-fizica"><option value="">Selectați județul</option></select></div>
+                    <div class="mpc-field"><label>Localitate</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-localitate-fizica" placeholder="Localitate" /></div>
+                    <div class="mpc-field mpc-field--full"><label>Adresa</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-adresa-fizica" placeholder="Adresa" /></div>
+                    <div class="mpc-field"><label>Cod poștal</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-codpostal-fizica" placeholder="Cod poștal" /></div>
+                  </div>
+                </div>
+                <div class="mpc-delivery-panel mpc-billing-panel--juridica">
+                  <div class="mpc-step2-fields mpc-step2-fields--two-cols">
+                    <div class="mpc-field mpc-field--cui"><label>CUI</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-cui" placeholder="Introduceți CUI..." /><button type="button" class="mpc-btn-cui-fetch mpc-billing-cui-fetch" aria-label="Preia date">↓</button></div>
+                    <div class="mpc-field"><label>Companie</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-companie" placeholder="Companie" /></div>
+                    <div class="mpc-field"><label>Județ</label><select class="mpc-input mpc-input--neutral mpc-billing-judet"><option value="">Selectați județul</option></select></div>
+                    <div class="mpc-field"><label>Localitate</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-localitate" placeholder="Localitate" /></div>
+                    <div class="mpc-field mpc-field--full"><label>Adresa</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-adresa" placeholder="Adresa" /></div>
+                    <div class="mpc-field"><label>Cod poștal</label><input type="text" class="mpc-input mpc-input--neutral mpc-billing-codpostal" placeholder="Cod poștal" /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="mpc-step2-section mpc-step2-supplier">
+            <h3 class="mpc-step2-section-title">Introduceți adresa și datele de contact a furnizorului</h3>
+            <div class="mpc-step2-fields mpc-step2-fields--two-cols">
+              <div class="mpc-field"><label>Provincie</label><input type="text" class="mpc-input mpc-input--neutral mpc-supplier-provincie" placeholder="Provincie" /></div>
+              <div class="mpc-field"><label>Oraș</label><input type="text" class="mpc-input mpc-input--neutral mpc-supplier-oras" placeholder="Oraș" /></div>
+              <div class="mpc-field mpc-field--full"><label>Adresa</label><input type="text" class="mpc-input mpc-input--neutral mpc-supplier-adresa" placeholder="Adresa" /></div>
+              <div class="mpc-field"><label>Cod poștal</label><input type="text" class="mpc-input mpc-input--neutral mpc-supplier-codpostal" placeholder="Cod poștal" /></div>
+              <div class="mpc-field"><label>Numărul persoanei de contact</label><input type="tel" class="mpc-input mpc-input--neutral mpc-supplier-telefon" placeholder="Telefon" /></div>
+              <div class="mpc-field"><label>Email persoana de contact</label><input type="email" class="mpc-input mpc-input--neutral mpc-supplier-email" placeholder="Email" /></div>
+            </div>
+            <div class="mpc-field mpc-field--observatii">
+              <label>Observații</label>
+              <textarea class="mpc-input mpc-input--neutral mpc-supplier-observatii" rows="4" placeholder="Adăugați orice observații sau instrucțiuni speciale..."></textarea>
+            </div>
+          </div>
+          <div class="mpc-step2-actions">
+            <button type="button" class="mpc-btn-step2-continue">Continuați</button>
+          </div>
+          <div class="mpc-step2-validation mpc-hidden" role="alert"></div>
+        </div>
+        <div class="mpc-step3-panel mpc-hidden">
+          <button type="button" class="mpc-step3-back" aria-label="Înapoi">← Înapoi</button>
+          <h2 class="mpc-step3-transport-name"></h2>
+          <div class="mpc-step3-cards">
+            <div class="mpc-step3-card">
+              <h3 class="mpc-step3-card-title">Datele clientului</h3>
+              <dl class="mpc-step3-dl">
+                <dt>Nume</dt><dd class="mpc-step3-client-nume">—</dd>
+                <dt>Prenume</dt><dd class="mpc-step3-client-prenume">—</dd>
+                <dt>Adresa</dt><dd class="mpc-step3-client-adresa">—</dd>
+                <dt>Telefon</dt><dd class="mpc-step3-client-telefon">—</dd>
+                <dt>E-mail</dt><dd class="mpc-step3-client-email">—</dd>
+              </dl>
+            </div>
+            <div class="mpc-step3-card">
+              <h3 class="mpc-step3-card-title">Datele furnizorului</h3>
+              <dl class="mpc-step3-dl">
+                <dt>Provincie</dt><dd class="mpc-step3-supplier-provincie">—</dd>
+                <dt>Oraș</dt><dd class="mpc-step3-supplier-oras">—</dd>
+                <dt>Adresa</dt><dd class="mpc-step3-supplier-adresa">—</dd>
+                <dt>Numărul persoanei de contact</dt><dd class="mpc-step3-supplier-telefon">—</dd>
+                <dt>Email persoana de contact</dt><dd class="mpc-step3-supplier-email">—</dd>
+              </dl>
+            </div>
+            <div class="mpc-step3-card">
+              <h3 class="mpc-step3-card-title">Marfă</h3>
+              <dl class="mpc-step3-dl">
+                <dt>Tip de marfă</dt><dd class="mpc-step3-cargo-tip">Generală</dd>
+                <dt>Volum</dt><dd class="mpc-step3-cargo-volum">—</dd>
+                <dt>Greutate</dt><dd class="mpc-step3-cargo-greutate">—</dd>
+                <dt>Volum tarifabil</dt><dd class="mpc-step3-cargo-volum-taxabil">—</dd>
+              </dl>
+            </div>
+            <div class="mpc-step3-card">
+              <h3 class="mpc-step3-card-title">Traseu</h3>
+              <dl class="mpc-step3-dl">
+                <dt>Condiții de livrare INCOTERMS</dt><dd class="mpc-step3-route-incoterms">—</dd>
+                <dt>Punctul de încărcare</dt><dd class="mpc-step3-route-loading">—</dd>
+                <dt>Punctul de descărcare</dt><dd class="mpc-step3-route-delivery">—</dd>
+              </dl>
+            </div>
+          </div>
+          <div class="mpc-step3-dvg-actions">
+            <button type="button" class="mpc-btn-offer mpc-btn-offer--send">Trimite solicitarea actuală către DVG-Cargo</button>
+            <p class="mpc-step3-dvg-note">Trimiteți oferta calculată către echipa DVG-Cargo</p>
+          </div>
+        </div>
+      </div>
+      <div class="mpc-sidebar-column">
+        <aside class="mpc-total-box">
+          <header class="mpc-total-box-header">Total comandă</header>
+          <div class="mpc-total-box-body">
+            <p class="mpc-total-box-empty mpc-total-box-hint">Alegeți transport</p>
+            <div class="mpc-total-box-details mpc-hidden">
+              <p class="mpc-total-box-section">TRANSPORT</p>
+              <p class="mpc-total-box-line mpc-total-box-line--transport"><span class="mpc-total-box-label"></span><strong class="mpc-total-box-price">€ 0</strong></p>
+              <div class="mpc-total-box-more" aria-live="polite"></div>
+              <hr class="mpc-total-box-sep" />
+              <p class="mpc-total-box-total-line"><strong>Total:</strong><strong class="mpc-total-box-total-amount">€ 0</strong></p>
+            </div>
+          </div>
+        </aside>
+        <section class="mpc-excel-rates-panel" aria-label="Tarife Excel (admin)">
+          <p class="mpc-excel-rates-badge">Admin</p>
+          <h3 class="mpc-excel-rates-title">Tarife Excel (coloana maritim)</h3>
+          <p class="mpc-excel-rates-desc">Aceeași interfață ca în Setări → My Plugin: încărcați .xlsx/.xls cu coloana „maritim”. Pe site, încărcarea reală se face din panoul WordPress.</p>
+          <div class="mpc-excel-rates-field">
+            <label class="mpc-excel-rates-label" for="mpc-preview-excel-file">Fișier Excel</label>
+            <input type="file" id="mpc-preview-excel-file" class="mpc-excel-rates-file" name="mpc_excel_preview" accept=".xlsx,.xls" />
+          </div>
+          <div class="mpc-excel-rates-actions">
+            <button type="button" class="mpc-btn mpc-excel-rates-btn-primary mpc-excel-rates-simulate-upload">Încarcă Excel</button>
+            <button type="button" class="mpc-btn mpc-excel-rates-btn-secondary" disabled>Simulare (dezactivat)</button>
+          </div>
+          <p class="mpc-excel-rates-filename mpc-hidden" role="status" aria-live="polite"></p>
+          <p class="mpc-excel-rates-note">Preview local: deschideți <code>calculator-preview.html</code> în browser. Link Admin apare doar când sunteți logat în WordPress.</p>
+        </section>
+        <section class="mpc-local-orders-panel" aria-label="Comenzi (admin)">
+          <p class="mpc-excel-rates-badge">Admin</p>
+          <h3 class="mpc-excel-rates-title">Comenzi (admin)</h3>
+          <p class="mpc-excel-rates-desc">Comenzile trimise se salvează în SQLite (server). Afișați tabelul și filtrați după tipul de transport.</p>
+          <div class="mpc-excel-rates-actions">
+            <button type="button" class="mpc-btn mpc-excel-rates-btn-primary mpc-local-orders-toggle">Afișează comenzi</button>
+          </div>
+          <div class="mpc-local-orders-body mpc-hidden">
+            <div class="mpc-local-orders-toolbar">
+              <label class="mpc-excel-rates-label" for="mpc-preview-local-orders-filter">Filtru transport</label>
+              <select id="mpc-preview-local-orders-filter" class="mpc-input mpc-local-orders-filter">
+                <option value="">Toate</option>
+                <option value="Aerian">Aerian</option>
+                <option value="Feroviar">Feroviar</option>
+                <option value="Maritim">Maritim</option>
+                <option value="Rutier">Rutier</option>
+              </select>
+              <button type="button" class="mpc-btn mpc-local-orders-clear">Șterge</button>
+            </div>
+            <div class="mpc-local-orders-table-wrap">
+              <table class="mpc-local-orders-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Transport</th>
+                    <th>Client</th>
+                    <th>Email</th>
+                    <th>Rută</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Detaliu</th>
+                  </tr>
+                </thead>
+                <tbody class="mpc-local-orders-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script>window.myPluginRoCitiesJsonUrl = 'assets/data/ro-cities.json'; window.myPluginCnCitiesJsonUrl = 'assets/data/cn-cities.json';</script>
+  <script>
+  (function () {
+    var h = location.hostname || '';
+    var proto = location.protocol || '';
+    var isHttpLocal = (proto === 'http:' || proto === 'https:') && (h === 'localhost' || h === '127.0.0.1');
+    if (!isHttpLocal) return;
+    var path = location.pathname || '';
+    var base = '/';
+    var last = path.lastIndexOf('/');
+    if (last > 0) {
+      base = path.slice(0, last + 1);
+    }
+    window.myPluginCalculatorL10n = {
+      ajaxUrl: base + 'dev-send-quote.php',
+      orderConfirmAction: 'my_plugin_confirm_order',
+      localOrdersListAction: 'my_plugin_local_orders_list',
+      localOrdersClearAction: 'my_plugin_local_orders_clear',
+      orderConfirmNonce: 'dev-local',
+      devLocalSkipNonce: true,
+      orderSuccessMessage: 'Comanda a fost înregistrată și cotația a fost trimisă pe email. Veți fi contactat în curând.',
+      orderErrorGeneric: 'Nu s-a putut trimite comanda. Încercați din nou.',
+      orderSending: 'Se trimite cotația…'
+    };
+  })();
+  </script>
+  <script src="assets/js/calculator.js"></script>
+  <script>
+  (function () {
+    var h = location.hostname || '';
+    var proto = location.protocol || '';
+    var local = proto === 'file:' || h === 'localhost' || h === '127.0.0.1' || /\.(local|test)$/.test(h);
+    if (!local) {
+      var el = document.querySelector('.mpc-excel-rates-panel');
+      if (el) el.parentNode.removeChild(el);
+      var elOrders = document.querySelector('.mpc-local-orders-panel');
+      if (elOrders) elOrders.parentNode.removeChild(elOrders);
+    }
+  })();
+  if (window.MyPluginCalculatorInit) window.MyPluginCalculatorInit();
+  </script>
+</body>
+</html>

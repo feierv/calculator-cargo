@@ -362,7 +362,7 @@ class My_Plugin_Admin {
 
 				<section class="my-plugin-admin-section my-plugin-admin-section--upload">
 					<div class="my-plugin-admin-preview-badge"><?php esc_html_e( 'ADMIN', 'my-plugin' ); ?></div>
-					<h2><?php esc_html_e( 'Tarife Excel (coloana maritim)', 'my-plugin' ); ?></h2>
+					<h2><?php esc_html_e( 'Tarife Excel', 'my-plugin' ); ?></h2>
 					<p class="description">
 						<?php esc_html_e( 'UI preview în admin, identic cu partea publică. Momentan această zonă este doar pentru aspect (fără funcționalitate nouă).', 'my-plugin' ); ?>
 					</p>
@@ -406,7 +406,7 @@ class My_Plugin_Admin {
 					$rows             = function_exists( 'my_plugin_local_orders_list' ) ? my_plugin_local_orders_list( $transport_filter, 500 ) : array();
 					?>
 					<hr />
-					<h3><?php esc_html_e( 'Comenzi (SQLite)', 'my-plugin' ); ?></h3>
+					<h3><?php esc_html_e( 'Comenzi', 'my-plugin' ); ?></h3>
 					<form method="get" action="<?php echo esc_url( admin_url( 'options-general.php' ) ); ?>" style="margin-bottom:8px;">
 						<input type="hidden" name="page" value="my-plugin" />
 						<label for="my_plugin_transport_filter"><strong><?php esc_html_e( 'Filtru transport', 'my-plugin' ); ?></strong></label>

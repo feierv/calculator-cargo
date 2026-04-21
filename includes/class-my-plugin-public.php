@@ -38,6 +38,10 @@ class My_Plugin_Public {
 		if ( is_admin() ) {
 			return;
 		}
+		$calculator_css_path = MY_PLUGIN_PATH . 'assets/css/calculator.css';
+		$calculator_js_path  = MY_PLUGIN_PATH . 'assets/js/calculator.js';
+		$calculator_css_ver  = file_exists( $calculator_css_path ) ? (string) filemtime( $calculator_css_path ) : MY_PLUGIN_VERSION;
+		$calculator_js_ver   = file_exists( $calculator_js_path ) ? (string) filemtime( $calculator_js_path ) : MY_PLUGIN_VERSION;
 		wp_enqueue_style(
 			'my-plugin-public',
 			MY_PLUGIN_URL . 'assets/css/public.css',
@@ -63,13 +67,13 @@ class My_Plugin_Public {
 			'my-plugin-calculator',
 			MY_PLUGIN_URL . 'assets/css/calculator.css',
 			array( 'my-plugin-calculator-font' ),
-			MY_PLUGIN_VERSION
+			$calculator_css_ver
 		);
 		wp_enqueue_script(
 			'my-plugin-calculator',
 			MY_PLUGIN_URL . 'assets/js/calculator.js',
 			array(),
-			MY_PLUGIN_VERSION,
+			$calculator_js_ver,
 			true
 		);
 		wp_localize_script(

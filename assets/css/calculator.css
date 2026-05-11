@@ -895,7 +895,16 @@
 .my-plugin-calculator .mpc-results[data-incoterm="exw"] .mpc-results-china {
 	display: block;
 }
-/* Numerotare: FOB 2.–3., EXW 2.–3.–4. */
+/* Linie CBM feroviar: vizibilă doar când e selectat transportul Feroviar (JS: .mpc-results--transport-rail). */
+.my-plugin-calculator .mpc-results-rail-cbm-line {
+	display: none;
+}
+.my-plugin-calculator .mpc-results.mpc-results--transport-rail .mpc-results-rail-cbm-line {
+	display: block;
+	margin: 0;
+}
+
+/* Numerotare: FOB 2., EXW 2.–3. (fără bloc separat RO door-to-door). */
 .my-plugin-calculator .mpc-num-exw {
 	display: none;
 }
@@ -1228,12 +1237,33 @@
 	margin: 0.25rem 0 0.5rem;
 }
 .my-plugin-calculator .mpc-total-box-more .mpc-total-box-line--extra {
-	margin: 0 0 0.35rem;
+	margin: 0 0 0.65rem;
 	font-size: 0.8125rem;
 	color: var(--mpc-text-muted);
+	flex-wrap: wrap;
+	row-gap: 0.15rem;
 }
 .my-plugin-calculator .mpc-total-box-more .mpc-total-box-line--extra:last-child {
 	margin-bottom: 0;
+}
+.my-plugin-calculator .mpc-total-box-explain {
+	flex: 1 1 100%;
+	font-size: 0.7125rem;
+	font-style: italic;
+	color: #6b7280;
+	line-height: 1.35;
+	margin-top: 0.1rem;
+}
+.my-plugin-calculator .mpc-total-box-more .mpc-total-box-line--service {
+	border-top: 1px dashed var(--mpc-border);
+	padding-top: 0.35rem;
+	margin-top: 0.35rem;
+	color: var(--mpc-text);
+}
+.my-plugin-calculator .mpc-total-box-more .mpc-total-box-line--service ~ .mpc-total-box-line--service {
+	border-top: none;
+	padding-top: 0;
+	margin-top: 0;
 }
 .my-plugin-calculator .mpc-service-item--toggle.mpc-service-item--added {
 	border-color: #0d7d4d;

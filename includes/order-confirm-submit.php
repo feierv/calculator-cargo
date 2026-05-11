@@ -50,8 +50,9 @@ function my_plugin_process_order_confirmation_from_post( array $post, array $arg
 					continue;
 				}
 				$tarife_lines[] = array(
-					'label' => isset( $line['label'] ) ? sanitize_text_field( $line['label'] ) : '',
-					'eur'   => isset( $line['eur'] ) ? sanitize_text_field( $line['eur'] ) : '',
+					'label'   => isset( $line['label'] ) ? sanitize_text_field( $line['label'] ) : '',
+					'eur'     => isset( $line['eur'] ) ? sanitize_text_field( $line['eur'] ) : '',
+					'explain' => isset( $line['explain'] ) ? sanitize_textarea_field( $line['explain'] ) : '',
 				);
 			}
 		}

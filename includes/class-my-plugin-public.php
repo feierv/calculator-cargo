@@ -40,8 +40,9 @@ class My_Plugin_Public {
 		}
 		$calculator_css_path = MY_PLUGIN_PATH . 'assets/css/calculator.css';
 		$calculator_js_path  = MY_PLUGIN_PATH . 'assets/js/calculator.js';
-		$calculator_css_ver  = file_exists( $calculator_css_path ) ? (string) filemtime( $calculator_css_path ) : MY_PLUGIN_VERSION;
-		$calculator_js_ver   = file_exists( $calculator_js_path ) ? (string) filemtime( $calculator_js_path ) : MY_PLUGIN_VERSION;
+		// Cache-bust agresiv: combină versiunea plugin-ului cu filemtime, ca CDN/plugin de cache să nu poată servi vechiul fișier.
+		$calculator_css_ver  = MY_PLUGIN_VERSION . '.' . ( file_exists( $calculator_css_path ) ? (string) filemtime( $calculator_css_path ) : '0' );
+		$calculator_js_ver   = MY_PLUGIN_VERSION . '.' . ( file_exists( $calculator_js_path ) ? (string) filemtime( $calculator_js_path ) : '0' );
 		wp_enqueue_style(
 			'my-plugin-public',
 			MY_PLUGIN_URL . 'assets/css/public.css',
@@ -370,7 +371,7 @@ class My_Plugin_Public {
 										<?php esc_html_e( 'Volum în funcție de greutate:', 'my-plugin' ); ?> <span class="mpc-results-weight-vol-value">1.00</span> m³<br>
 										<?php esc_html_e( 'Chargeable Weight (Aerian, IATA 1:6):', 'my-plugin' ); ?> <span class="mpc-results-air-weight-value">167</span> kg<br>
 										<?php esc_html_e( 'Echivalent kg (300 kg/CBM, max V vs kg÷300):', 'my-plugin' ); ?> <span class="mpc-results-rail-weight-value">200</span> kg<br>
-										<?php esc_html_e( 'CBM taxabil feroviar:', 'my-plugin' ); ?> <span class="mpc-results-rail-billable-cbm">1.00</span> m³
+										<span class="mpc-results-rail-cbm-line"><?php esc_html_e( 'CBM taxabil feroviar:', 'my-plugin' ); ?> <span class="mpc-results-rail-billable-cbm">1.00</span> m³</span>
 									</p>
 								</div>
 								<h3 class="mpc-results-transport-title">1. <?php esc_html_e( 'Transport Internațional (freight) China-România', 'my-plugin' ); ?></h3>
@@ -401,20 +402,12 @@ class My_Plugin_Public {
 									<div class="mpc-results-section mpc-results-china">
 										<h3 class="mpc-results-section-title">2. <?php esc_html_e( 'Servicii locale China (pentru EXW)', 'my-plugin' ); ?> <span class="mpc-help-icon" title="<?php esc_attr_e( 'Informații', 'my-plugin' ); ?>">?</span></h3>
 										<div class="mpc-service-item mpc-service-item--included">
-											<span class="mpc-service-name"><?php esc_html_e( 'Servicii locale China', 'my-plugin' ); ?> <span class="mpc-service-check" aria-hidden="true">✓</span></span>
-											<span class="mpc-service-price mpc-service-price--included">417 € <?php esc_html_e( 'INCLUS', 'my-plugin' ); ?></span>
-										</div>
-									</div>
-									<div class="mpc-results-section mpc-results-local">
-										<h3 class="mpc-results-section-title"><span class="mpc-num-fob">2.</span><span class="mpc-num-exw">3.</span> <?php esc_html_e( 'Servicii locale România', 'my-plugin' ); ?> <span class="mpc-results-section-note">(<?php esc_html_e( 'TVA nu este inclus în preț', 'my-plugin' ); ?>)</span> <span class="mpc-help-icon" title="<?php esc_attr_e( 'Informații', 'my-plugin' ); ?>">?</span></h3>
-										<div class="mpc-service-item mpc-service-item--toggle" data-service-id="door" data-service-price="76" data-service-label="<?php echo esc_attr( __( 'Livrare door to door', 'my-plugin' ) ); ?>">
-											<span class="mpc-service-name"><?php esc_html_e( 'Livrare door to door', 'my-plugin' ); ?></span>
-											<span class="mpc-service-price">76 €</span>
-											<button type="button" class="mpc-btn-add-service"><?php esc_html_e( 'Adăugați', 'my-plugin' ); ?></button>
+											<span class="mpc-service-name"><?php esc_html_e( 'Pick-up + CFS + THC + B/L + vamă export + ENS UE', 'my-plugin' ); ?> <span class="mpc-service-check" aria-hidden="true">✓</span></span>
+											<span class="mpc-service-price mpc-service-price--included"><?php esc_html_e( 'INCLUS în prețul transportului', 'my-plugin' ); ?></span>
 										</div>
 									</div>
 									<div class="mpc-results-section mpc-results-optional mpc-hidden" data-mpc-rail-sea-extras="1">
-										<h3 class="mpc-results-section-title"><span class="mpc-num-fob">3.</span><span class="mpc-num-exw">4.</span> <?php esc_html_e( 'Servicii aditionale', 'my-plugin' ); ?></h3>
+										<h3 class="mpc-results-section-title"><span class="mpc-num-fob">2.</span><span class="mpc-num-exw">3.</span> <?php esc_html_e( 'Servicii aditionale', 'my-plugin' ); ?></h3>
 										<div class="mpc-service-item mpc-service-item--toggle mpc-service-item--disabled" data-service-id="portuare" data-service-price="700" data-service-label="<?php echo esc_attr( __( 'Prestatii portuare', 'my-plugin' ) ); ?>">
 											<span class="mpc-service-name"><?php esc_html_e( 'Prestatii portuare', 'my-plugin' ); ?></span>
 											<span class="mpc-service-price">700 €</span>

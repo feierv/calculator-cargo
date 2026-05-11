@@ -28,6 +28,12 @@
 		return isNaN(n) ? 0 : n;
 	}
 
+	/** Doar 'fob' este tratat ca FOB; orice altceva → EXW (evită valori goale / spații). */
+	function normalizeIncoterm(raw) {
+		var s = raw == null ? '' : String(raw).trim().toLowerCase();
+		return s === 'fob' ? 'fob' : 'exw';
+	}
+
 	/** Servicii locale China incluse la EXW (€) – aliniat cu UI */
 	var PRICE_CHINA_EXW = 417;
 
@@ -66,10 +72,17 @@
 	var SEA_EXW_LOCAL_CHARGE_USD_LT_40CBM = 150;
 	var SEA_EXW_LOCAL_CHARGE_USD_40PLUS_OR_12T = 280;
 	var SEA_EXW_LOCAL_CHARGE_WEIGHT_TON_THRESHOLD = 12;
+	/** ENS UE (ICS2 Release 3) – obligatoriu pentru orice marfă LCL spre UE (sea/rail). */
+	var ENS_EU_USD = 40;
+	/** Vamă export China – declarație + manipulare; aplicat doar la EXW. */
+	var CN_EXPORT_CUSTOMS_USD = 120;
+	/** Tranzit vamal T1 (€ fix) – aplicat la toate modurile (aerian/feroviar/maritim), ambele incoterm-uri. */
+	var TRANSIT_T1_EUR = 150;
 	var USD_TO_EUR = 0.92; // aer + același factor pentru consistență afișaj
 	var RON_TO_EUR = 0.20; // 1 EUR ~ 5 RON
-	var SEA_MIN_SPRINTER_KG = 300;
-	var SEA_MIN_FULL_TRUCK_KG = 1200;
+	// Praguri FTL din tabel: Sprinter 1200 kg, Full Truck 22 tone.
+	var FTL_MIN_SPRINTER_KG = 1200;
+	var FTL_MIN_FULL_TRUCK_KG = 22000;
 
 	/**
 	 * Tarif principal RAIL (USD/CBM) pe origine — ușor / dens (dens ≈ ușor + 7 ca în SMILE).
@@ -317,15 +330,19 @@
 			: null;
 	}
 
-	function getSeaRoadRon(weightRealKg, roDestCity) {
+	function getRoadRonByDest(weightRealKg, roDestCity, roadTable) {
 		var destKey = normalizeRoCityName(roDestCity);
-		var road = LOCAL_CONSTANTA_TO_RON_BY_DEST[destKey];
+		var road = roadTable[destKey];
 		if (!road) return 0;
-		if (weightRealKg >= SEA_MIN_FULL_TRUCK_KG) return road.full || 0;
-		if (weightRealKg >= SEA_MIN_SPRINTER_KG) return road.sprinter || 0;
+		if (weightRealKg >= FTL_MIN_FULL_TRUCK_KG) return road.full || 0;
+		if (weightRealKg >= FTL_MIN_SPRINTER_KG) return road.sprinter || 0;
 		if (road.coload != null) return road.coload;
 		// Dacă CO LOAD nu există în tabel pentru destinația respectivă, folosim Sprinter ca fallback.
 		return road.sprinter || 0;
+	}
+
+	function getSeaRoadRon(weightRealKg, roDestCity) {
+		return getRoadRonByDest(weightRealKg, roDestCity, LOCAL_CONSTANTA_TO_RON_BY_DEST);
 	}
 
 	/** Pick-up China (USD/CBM) — tabel „Local WH Pick-up fee” (MARITIM EXW). */
@@ -351,37 +368,71 @@
 		return SEA_EXW_LOCAL_CHARGE_USD_LT_40CBM;
 	}
 
-	function computeAirTransportPriceEur(chargeableKg, cnOriginCity, roDestCity) {
+	/**
+	 * Aerian:
+	 * - FOB: (camion China→aeroport + aer) USD×0.92 + rutier Otopeni→dest RON×RON_TO_EUR
+	 * - EXW: aceleași adaosuri China ca maritimul EXW (pick-up pe volum + LOCAL CHARGES), apoi
+	 *   total China USD×0.85 + rutier RON÷5.1 (aliniat la computeSeaTransportPriceEur EXW).
+	 *
+	 * @param {number} chargeableKg          Greutate taxabilă pentru segmentul aerian (IATA)
+	 * @param {string} cnOriginCity
+	 * @param {string} roDestCity
+	 * @param {number} [weightRealKgRoad]    Greutate reală pentru praguri FTL RO
+	 * @param {number} [volumeM3Exw]         Volum fizic (m³) pentru pick-up / local charges EXW
+	 * @param {number} [weightRealKgExwLocal] Greutate reală pentru pragul 12T la LOCAL CHARGES
+	 * @param {string} [incotermMode]        'exw' | 'fob'
+	 */
+	function computeAirTransportPriceEur(
+		chargeableKg,
+		cnOriginCity,
+		roDestCity,
+		weightRealKgRoad,
+		volumeM3Exw,
+		weightRealKgExwLocal,
+		incotermMode
+	) {
 		var origin = (cnOriginCity || '').toString().trim();
 		var truckRate = AIR_TRUCK_RATE_BY_CN_CITY[origin];
 		if (!truckRate) return null;
 
-		// China segment (oraș -> PVG): camion până la aeroport + aer.
 		var truckUsd = Math.max(chargeableKg * truckRate, AIRFREIGHT_TRUCK_MIN_USD);
 		var airUsd = chargeableKg * AIRFREIGHT_AIR_RATE_USD_PER_KG;
-		var chinaEur = (truckUsd + airUsd) * USD_TO_EUR;
 
-		// Local road segment: OTOPENI -> destinație (RON).
-		var destKey = normalizeRoCityName(roDestCity);
-		var road = LOCAL_OTOPENI_TO_RON_BY_DEST[destKey];
-		var roadRon = 0;
-		if (road) {
-			// Heuristică simplă: "CO LOAD 1-8 PALETI" e pentru încărcări mici.
-			// Dacă există valoarea, o folosim sub pragul de 600 kg.
-			if (road.coload != null && chargeableKg <= 600) {
-				roadRon = road.coload;
-			} else {
-				roadRon = chargeableKg <= 1200 ? road.sprinter : road.full;
-			}
+		var roadKg =
+			typeof weightRealKgRoad === 'number' && !isNaN(weightRealKgRoad) && weightRealKgRoad >= 0
+				? weightRealKgRoad
+				: chargeableKg;
+		var roadRon = getRoadRonByDest(roadKg, roDestCity, LOCAL_OTOPENI_TO_RON_BY_DEST);
+
+		var inc = normalizeIncoterm(incotermMode);
+		var items = [];
+		if (inc === 'exw') {
+			var vol = Math.max(0, volumeM3Exw || 0);
+			var wExw = Math.max(0, weightRealKgExwLocal || 0);
+			var pickupUsd = vol * getSeaExwPickupUsdPerCbm(vol);
+			var localUsd = getSeaExwLocalChargesUsd(vol, wExw);
+			var customsUsd = CN_EXPORT_CUSTOMS_USD;
+			items.push({ key: 'air_freight', label: 'Aerian China → România (freight)', explain: 'Costul zborului mărfii cu liniile aeriene, calculat pe greutatea taxabilă (IATA 1:6).', eur: Math.round(airUsd * USD_TO_EUR) });
+			items.push({ key: 'truck_cn_air', label: 'Camion factory → aeroport China', explain: 'Transport rutier intern în China, din fabrică până la aeroportul de plecare.', eur: Math.round(truckUsd * USD_TO_EUR) });
+			items.push({ key: 'pickup_cn', label: 'Pick-up factory → CFS China', explain: 'Ridicarea fizică a mărfii din fabrică spre depozitul de consolidare (CFS), tarif pe CBM.', eur: Math.round(pickupUsd * USD_TO_EUR) });
+			items.push({ key: 'local_cn', label: 'Servicii locale China (CFS + THC + B/L)', explain: 'Manipulare în CFS, Terminal Handling Charges și emiterea documentului de transport (Bill of Lading).', eur: Math.round(localUsd * USD_TO_EUR) });
+			items.push({ key: 'customs_cn', label: 'Vamă export China (declarație)', explain: 'Declarația vamală de export depusă de agentul vamal în China (necesară la EXW).', eur: Math.round(customsUsd * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Otopeni → adresă livrare', explain: 'Transport rutier intern în România, din aeroport până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
+		} else {
+			items.push({ key: 'air_freight', label: 'Aerian China → România (freight)', explain: 'Costul zborului mărfii cu liniile aeriene, calculat pe greutatea taxabilă (IATA 1:6).', eur: Math.round(airUsd * USD_TO_EUR) });
+			items.push({ key: 'truck_cn_air', label: 'Camion factory → aeroport China', explain: 'Transport rutier intern în China, din fabrică până la aeroportul de plecare.', eur: Math.round(truckUsd * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Otopeni → adresă livrare', explain: 'Transport rutier intern în România, din aeroport până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
 		}
-		var roadEur = roadRon * RON_TO_EUR;
-
-		return Math.round(chinaEur + roadEur);
+		var total = items.reduce(function (s, it) { return s + (it.eur || 0); }, 0);
+		return { total: total, items: items };
 	}
 
 	/**
 	 * Estimator feroviar LCL (metodă „pe hârtie”): CBM taxabil = max(V, kg/300); apoi Rail + Pick-up + Local + Extra (USD); EUR = sumă×USD_TO_EUR.
-	 * Rutier RO exclus. Tarif rail: coloana București (ușor/dens). Nu folosește coeficient 333 kg/m³.
+	 * Include rutier RO (Constanța -> destinație) pe praguri FTL/sprinter/co-load.
+	 * Tarif rail: coloana București (ușor/dens). Nu folosește coeficient 333 kg/m³.
 	 */
 	function getRailBucharestUsdPerCbmPair(cnOriginCity) {
 		var o = (cnOriginCity || '').toString().trim();
@@ -412,20 +463,29 @@
 		var usdRailPerCbm = densityKgPerM3 < RAIL_SMILE_TIER_KG_PER_M3 ? pair.light : pair.heavy;
 
 		var railUsd = taxableCbm * usdRailPerCbm;
-		var inc = (incotermMode || 'exw').toString().toLowerCase();
+		var roadRon = getSeaRoadRon(w, roDestCity);
+		var inc = normalizeIncoterm(incotermMode);
+		var items = [];
 		if (inc === 'fob') {
-			var roadRonFob = getSeaRoadRon(w, roDestCity);
-			var railEurFob = railUsd * RAIL_FOB_USD_TO_EUR;
-			var roadEurFob = roadRonFob / RAIL_FOB_RON_PER_EUR;
-			return Math.round(railEurFob + roadEurFob);
+			items.push({ key: 'rail_freight', label: 'Feroviar China → România (freight)', explain: 'Costul transportului pe calea ferată pe ruta China–România, calculat pe CBM taxabil.', eur: Math.round(railUsd * USD_TO_EUR) });
+			items.push({ key: 'ens_eu', label: 'ENS UE (ICS2 R3, obligatoriu)', explain: 'Entry Summary Declaration depusă obligatoriu cu 24h înainte de îmbarcare pentru orice marfă LCL spre UE.', eur: Math.round(ENS_EU_USD * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Constanța → adresă livrare', explain: 'Transport rutier intern în România, din terminalul feroviar/portul de descărcare până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
+		} else {
+			var pickupUsd = vol * getSeaExwPickupUsdPerCbm(vol);
+			var localUsd = taxableCbm * RAIL_LOCAL_USD_PER_CBM + RAIL_LOCAL_USD_FIXED;
+			var extraUsd = taxableCbm * RAIL_EXTRA_USD_PER_CBM + RAIL_EXTRA_USD_FIXED;
+			items.push({ key: 'rail_freight', label: 'Feroviar China → România (freight)', explain: 'Costul transportului pe calea ferată pe ruta China–România, calculat pe CBM taxabil (max(volum, kg/300)).', eur: Math.round(railUsd * USD_TO_EUR) });
+			items.push({ key: 'pickup_cn', label: 'Pick-up factory → terminal China', explain: 'Ridicarea fizică a mărfii din fabrică spre terminalul feroviar de încărcare, tarif pe CBM.', eur: Math.round(pickupUsd * USD_TO_EUR) });
+			items.push({ key: 'local_cn', label: 'Servicii locale China (handling + B/L)', explain: 'Manipulare în terminal și emiterea documentului de transport (Rail Waybill / B/L).', eur: Math.round(localUsd * USD_TO_EUR) });
+			items.push({ key: 'extra_rail', label: 'Servicii suplimentare feroviar (cut-off)', explain: 'Taxe suplimentare pentru încadrarea în cut-off-ul de tren și manipulări auxiliare.', eur: Math.round(extraUsd * USD_TO_EUR) });
+			items.push({ key: 'customs_cn', label: 'Vamă export China (declarație)', explain: 'Declarația vamală de export depusă de agentul vamal în China (necesară la EXW).', eur: Math.round(CN_EXPORT_CUSTOMS_USD * USD_TO_EUR) });
+			items.push({ key: 'ens_eu', label: 'ENS UE (ICS2 R3, obligatoriu)', explain: 'Entry Summary Declaration depusă obligatoriu cu 24h înainte de îmbarcare pentru orice marfă LCL spre UE.', eur: Math.round(ENS_EU_USD * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Constanța → adresă livrare', explain: 'Transport rutier intern în România, din terminalul feroviar/portul de descărcare până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
 		}
-
-		var pickupUsd = taxableCbm * getRailPickupUsdPerCbm(origin);
-		var localUsd = taxableCbm * RAIL_LOCAL_USD_PER_CBM + RAIL_LOCAL_USD_FIXED;
-		var extraUsd = taxableCbm * RAIL_EXTRA_USD_PER_CBM + RAIL_EXTRA_USD_FIXED;
-
-		var totalUsd = railUsd + pickupUsd + localUsd + extraUsd;
-		return Math.round(totalUsd * RAIL_USD_TO_EUR);
+		var total = items.reduce(function (s, it) { return s + (it.eur || 0); }, 0);
+		return { total: total, items: items };
 	}
 
 	/**
@@ -450,27 +510,35 @@
 
 		var seaUsd = wmTaxable * seaRateUsdPerWm;
 		var roadRon = getSeaRoadRon(weight, roDestCity);
-		var inc = (incotermMode || 'exw').toString().toLowerCase();
+		var inc = normalizeIncoterm(incotermMode);
+		var items = [];
 		if (inc === 'exw') {
 			var pickupUsd = vol * getSeaExwPickupUsdPerCbm(vol);
 			var localUsd = getSeaExwLocalChargesUsd(vol, weight);
-			var totalChinaUsd = seaUsd + pickupUsd + localUsd;
-			var chinaEurExw = totalChinaUsd * SEA_EXW_USD_TO_EUR;
-			var roadEurExw = roadRon / SEA_EXW_RON_PER_EUR;
-			return Math.round(chinaEurExw + roadEurExw);
+			items.push({ key: 'sea_freight', label: 'Maritim China → Constanța (freight)', explain: 'Costul transportului maritim LCL pe ruta China–Constanța, calculat pe W/M taxabil (max(CBM, tone)).', eur: Math.round(seaUsd * USD_TO_EUR) });
+			items.push({ key: 'pickup_cn', label: 'Pick-up factory → CFS China', explain: 'Ridicarea fizică a mărfii din fabrică spre depozitul de consolidare (CFS), tarif pe CBM.', eur: Math.round(pickupUsd * USD_TO_EUR) });
+			items.push({ key: 'local_cn', label: 'Servicii locale China (CFS + THC + B/L)', explain: 'Manipulare în CFS, Terminal Handling Charges și emiterea documentului de transport (Bill of Lading).', eur: Math.round(localUsd * USD_TO_EUR) });
+			items.push({ key: 'customs_cn', label: 'Vamă export China (declarație)', explain: 'Declarația vamală de export depusă de agentul vamal în China (necesară la EXW).', eur: Math.round(CN_EXPORT_CUSTOMS_USD * USD_TO_EUR) });
+			items.push({ key: 'ens_eu', label: 'ENS UE (ICS2 R3, obligatoriu)', explain: 'Entry Summary Declaration depusă obligatoriu cu 24h înainte de îmbarcare pentru orice marfă LCL spre UE.', eur: Math.round(ENS_EU_USD * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Constanța → adresă livrare', explain: 'Transport rutier intern în România, din portul Constanța până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
+		} else {
+			items.push({ key: 'sea_freight', label: 'Maritim China → Constanța (freight)', explain: 'Costul transportului maritim LCL pe ruta China–Constanța, calculat pe W/M taxabil (max(CBM, tone)).', eur: Math.round(seaUsd * USD_TO_EUR) });
+			items.push({ key: 'ens_eu', label: 'ENS UE (ICS2 R3, obligatoriu)', explain: 'Entry Summary Declaration depusă obligatoriu cu 24h înainte de îmbarcare pentru orice marfă LCL spre UE.', eur: Math.round(ENS_EU_USD * USD_TO_EUR) });
+			items.push({ key: 'transit_t1', label: 'Tranzit vamal T1', explain: 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', eur: TRANSIT_T1_EUR });
+			items.push({ key: 'road_ro', label: 'Rutier Constanța → adresă livrare', explain: 'Transport rutier intern în România, din portul Constanța până la adresa indicată; tarif din tabelul FTL pe praguri Full Truck / Sprinter / CO-LOAD.', eur: Math.round(roadRon * RON_TO_EUR) });
 		}
-		var seaEur = seaUsd * USD_TO_EUR;
-		var roadEur = roadRon * RON_TO_EUR;
-		return Math.round(seaEur + roadEur);
+		var total = items.reduce(function (s, it) { return s + (it.eur || 0); }, 0);
+		return { total: total, items: items };
 	}
 
 	function getIncotermMode(container) {
 		var r = container.querySelector('.mpc-results');
 		if (r && !r.classList.contains('mpc-hidden') && r.getAttribute('data-incoterm')) {
-			return r.getAttribute('data-incoterm');
+			return normalizeIncoterm(r.getAttribute('data-incoterm'));
 		}
-		var btn = container.querySelector('.mpc-incoterm.mpc-active');
-		return (btn && btn.getAttribute('data-mode')) || 'exw';
+		var btn = container.querySelector('.mpc-toggle-group--incoterms .mpc-incoterm.mpc-active');
+		return normalizeIncoterm(btn && btn.getAttribute('data-mode'));
 	}
 
 	/**
@@ -479,7 +547,7 @@
 	 */
 	function applyTransportAvailabilityByIncoterm(container) {
 		var inc = getIncotermMode(container);
-		var isExw = inc === 'exw';
+		var isExw = normalizeIncoterm(inc) === 'exw';
 
 		function setCardDisabled(card, disabled) {
 			if (!card) return;
@@ -566,6 +634,17 @@
 		}
 	}
 
+	function syncResultsRailCbmLineVisibility(container) {
+		var resultsEl = container.querySelector('.mpc-results');
+		if (!resultsEl) return;
+		var selected = container.querySelector('.mpc-result-card--selected');
+		if (selected && selected.classList.contains('mpc-result-card--rail')) {
+			resultsEl.classList.add('mpc-results--transport-rail');
+		} else {
+			resultsEl.classList.remove('mpc-results--transport-rail');
+		}
+	}
+
 	function resetTransportAndTotal(container) {
 		var btnChooseText = 'Alegeți';
 		container.querySelectorAll('.mpc-result-card').forEach(function (c) {
@@ -573,6 +652,7 @@
 			var b = c.querySelector('.mpc-btn-choose');
 			if (b) b.textContent = btnChooseText;
 		});
+		syncResultsRailCbmLineVisibility(container);
 		resetServiceSelections(container);
 		updateRailSeaExtrasForContainer(container);
 		var totalBox = container.querySelector('.mpc-total-box');
@@ -745,8 +825,8 @@
 		if (volTaxabil) volTaxabil.textContent = (volVal || '—') + (volVal ? ' m³' : '');
 		if (greutate) greutate.textContent = (airW || '—') + (airW ? ' kg' : '');
 
-		var incotermBtn = container.querySelector('.mpc-incoterm.mpc-active');
-		var incotermLabel = incotermBtn ? (incotermBtn.getAttribute('data-mode') === 'exw' ? 'EXW (Ex Works)' : 'FOB (Free On Board)') : '—';
+		var incMode = getIncotermMode(container);
+		var incotermLabel = incMode === 'exw' ? 'EXW (Ex Works)' : 'FOB (Free On Board)';
 		if (incoterms) incoterms.textContent = incotermLabel;
 
 		var addrRow = container.querySelector('.mpc-address-row');
@@ -869,8 +949,9 @@
 		step3.querySelector('.mpc-step3-cargo-greutate').textContent = airW !== '—' ? airW + ' kg' : '—';
 		step3.querySelector('.mpc-step3-cargo-volum-taxabil').textContent = volVal !== '—' ? volVal + ' m³' : '—';
 
-		var incotermBtn = container.querySelector('.mpc-incoterm.mpc-active');
-		step3.querySelector('.mpc-step3-route-incoterms').textContent = incotermBtn ? (incotermBtn.getAttribute('data-mode') === 'exw' ? 'EXW (Ex Works)' : 'FOB (Free On Board)') : '—';
+		var incMode3 = getIncotermMode(container);
+		step3.querySelector('.mpc-step3-route-incoterms').textContent =
+			incMode3 === 'exw' ? 'EXW (Ex Works)' : 'FOB (Free On Board)';
 		var addrRow = container.querySelector('.mpc-address-row');
 		var loadStr = '—';
 		var delStr = '—';
@@ -935,16 +1016,26 @@
 		var transportEurStr = card ? card.getAttribute('data-transport-price') || '0' : '0';
 		var tEur = parseFloat(String(transportEurStr).replace(',', '.'), 10) || 0;
 		var inc = getIncotermMode(container);
-		var logisticCn = inc === 'exw' ? PRICE_CHINA_EXW : 0;
-		var logisticRo = 0;
+		var isSeaCard = card && card.classList.contains('mpc-result-card--sea');
+		var isAirCard = card && card.classList.contains('mpc-result-card--air');
+		var logisticRoAuto = card ? parseFloat(card.getAttribute('data-road-price-eur') || '0', 10) || 0 : 0;
+		var cardBreakdown = [];
+		if (card) {
+			var bdRaw = card.getAttribute('data-breakdown');
+			if (bdRaw) {
+				try {
+					var bdParsed = JSON.parse(bdRaw);
+					if (Array.isArray(bdParsed)) cardBreakdown = bdParsed;
+				} catch (eBp) {}
+			}
+		}
 		var portuareEur = 0;
 		var importEur = 0;
 		var importHsCount = 2;
 		container.querySelectorAll('.mpc-service-item--toggle.mpc-service-item--added').forEach(function (item) {
 			var sid = item.getAttribute('data-service-id') || '';
 			var pr = parseFloat(item.getAttribute('data-service-price') || '0', 10) || 0;
-			if (sid === 'door') logisticRo = pr;
-			else if (sid === 'portuare') portuareEur = pr;
+			if (sid === 'portuare') portuareEur = pr;
 			else if (sid === 'import') {
 				var hsInp = item.querySelector('.mpc-import-hs-count');
 				importHsCount = hsInp ? Math.max(2, Math.floor(parseNum(hsInp.value))) : 2;
@@ -955,18 +1046,33 @@
 				importEur = (importHsCount / packageSize) * packagePrice;
 			}
 		});
-		var totalNum = tEur + logisticCn + logisticRo + portuareEur + importEur;
 
-		var tarifeLines = [
-			{ label: 'Transport Internațional (freight) China-România', eur: tEur + ' Euro' },
-			{ label: 'Servicii logistice locale CN (EXW)', eur: logisticCn + ' Euro' },
-			{ label: 'Servicii logistice locale RO — Livrare door to door (TVA nu este inclus în preț)', eur: logisticRo + ' Euro' },
-			{ label: 'Prestatii portuare (la cerere, TVA nu este inclus în preț)', eur: portuareEur + ' Euro' },
-			{
+		var tarifeLines = [];
+		var totalNum = 0;
+		if (cardBreakdown.length) {
+			cardBreakdown.forEach(function (it) {
+				var eurN = Math.round(parseFloat(it.eur, 10) || 0);
+				totalNum += eurN;
+				tarifeLines.push({ label: it.label || '', eur: eurN + ' Euro', explain: it.explain || '' });
+			});
+		} else {
+			var fallbackChina = inc === 'exw' && !isSeaCard && !isAirCard ? PRICE_CHINA_EXW : 0;
+			tarifeLines.push({ label: 'Transport Internațional (freight) China-România', eur: tEur + ' Euro' });
+			tarifeLines.push({ label: 'Servicii logistice locale CN (EXW)', eur: fallbackChina + ' Euro' });
+			tarifeLines.push({ label: 'Servicii logistice locale RO (FTL)', eur: logisticRoAuto + ' Euro' });
+			totalNum = tEur + fallbackChina + logisticRoAuto;
+		}
+		if (portuareEur > 0) {
+			tarifeLines.push({ label: 'Prestații portuare (opțional)', eur: portuareEur + ' Euro' });
+			totalNum += portuareEur;
+		}
+		if (importEur > 0) {
+			tarifeLines.push({
 				label: 'Perfectare declarație de import (100 Euro / 2 coduri HS). Coduri HS: ' + importHsCount,
 				eur: importEur + ' Euro'
-			}
-		];
+			});
+			totalNum += importEur;
+		}
 
 		var totalDisplay = totalNum + ' Euro';
 		var totalBox = container.querySelector('.mpc-total-box');
@@ -1534,27 +1640,73 @@
 			return n;
 		}
 
+		function appendBoxLine(text, eur, modifier, explain) {
+			if (!moreEl) return;
+			var p = document.createElement('p');
+			p.className = 'mpc-total-box-line mpc-total-box-line--extra' + (modifier ? ' ' + modifier : '');
+			var labelHtml = '<span class="mpc-total-box-label"></span>';
+			var priceHtml = '<strong class="mpc-total-box-price">€ ' + Math.round(eur) + '</strong>';
+			p.innerHTML = labelHtml + priceHtml;
+			p.querySelector('.mpc-total-box-label').textContent = text;
+			if (explain) {
+				var hint = document.createElement('span');
+				hint.className = 'mpc-total-box-explain';
+				hint.textContent = explain;
+				p.appendChild(hint);
+			}
+			moreEl.appendChild(p);
+		}
+
+		function readCardBreakdown(card) {
+			if (!card) return null;
+			var raw = card.getAttribute('data-breakdown');
+			if (!raw) return null;
+			try {
+				var parsed = JSON.parse(raw);
+				return Array.isArray(parsed) ? parsed : null;
+			} catch (eR) {
+				return null;
+			}
+		}
+
 		function updateOrderTotal() {
 			var card = container.querySelector('.mpc-result-card--selected');
 			if (!card || !details || details.classList.contains('mpc-hidden')) return;
-			var transportPrice = parseFloat(card.getAttribute('data-transport-price') || '0', 10) || 0;
 			var inc = getIncotermMode(container);
-			// MARITIM EXW include deja costurile locale din China în prețul cardului;
-			// evităm dublarea cu linia fixă „Servicii locale China (EXW)”.
 			var isSea = card.classList.contains('mpc-result-card--sea');
-			var china = inc === 'exw' && !isSea ? PRICE_CHINA_EXW : 0;
-			var extrasSum = 0;
+			var isAir = card.classList.contains('mpc-result-card--air');
+			var breakdown = readCardBreakdown(card);
+			var transportPrice = parseFloat(card.getAttribute('data-transport-price') || '0', 10) || 0;
+			var roadAuto = parseFloat(card.getAttribute('data-road-price-eur') || '0', 10) || 0;
+			var label = card.getAttribute('data-transport-label') || card.querySelector('.mpc-result-card-name');
+			if (label && label.nodeName) label = label.textContent;
+			if (labelEl) labelEl.textContent = label || '';
+
 			if (moreEl) moreEl.innerHTML = '';
-			if (inc === 'exw' && china > 0 && moreEl) {
-				var pCn = document.createElement('p');
-				pCn.className = 'mpc-total-box-line mpc-total-box-line--extra';
-				pCn.innerHTML = '<span class="mpc-total-box-label"></span><strong class="mpc-total-box-price">€ ' + china + '</strong>';
-				pCn.querySelector('.mpc-total-box-label').textContent = 'Servicii locale China (EXW)';
-				moreEl.appendChild(pCn);
+
+			var transportSubtotal = 0;
+			if (breakdown && breakdown.length) {
+				breakdown.forEach(function (it) {
+					var eur = parseFloat(it.eur, 10) || 0;
+					transportSubtotal += eur;
+					appendBoxLine(it.label || '', eur, '', it.explain || '');
+				});
+				if (priceEl) priceEl.textContent = '€ ' + Math.round(transportSubtotal);
+			} else {
+				transportSubtotal = transportPrice + roadAuto;
+				var china = inc === 'exw' && !isSea && !isAir ? PRICE_CHINA_EXW : 0;
+				if (china > 0) {
+					transportSubtotal += china;
+					appendBoxLine('Servicii locale China (EXW)', china);
+				}
+				if (roadAuto > 0) appendBoxLine('Servicii logistice locale RO (FTL)', roadAuto);
+				if (priceEl) priceEl.textContent = '€ ' + transportPrice;
 			}
+
+			var extrasSum = 0;
 			container.querySelectorAll('.mpc-service-item--toggle.mpc-service-item--added').forEach(function (item) {
 				var price = parseFloat(item.getAttribute('data-service-price') || '0', 10) || 0;
-				var label = item.getAttribute('data-service-label') || '';
+				var labelExtra = item.getAttribute('data-service-label') || '';
 				var sid = item.getAttribute('data-service-id') || '';
 				if (sid === 'import') {
 					var hsInp = item.querySelector('.mpc-import-hs-count');
@@ -1563,23 +1715,14 @@
 					var packageSize = parseInt(item.getAttribute('data-hs-package-size') || '2', 10) || 2;
 					var packagePrice = parseFloat(item.getAttribute('data-hs-package-price') || String(price), 10) || price;
 					price = (hsCount / packageSize) * packagePrice;
-					label = 'Declarația de import (' + hsCount + ' coduri HS)';
+					labelExtra = 'Declarația de import (' + hsCount + ' coduri HS)';
 				}
 				extrasSum += price;
-				if (moreEl) {
-					var p = document.createElement('p');
-					p.className = 'mpc-total-box-line mpc-total-box-line--extra';
-					p.innerHTML = '<span class="mpc-total-box-label"></span><strong class="mpc-total-box-price">€ ' + price + '</strong>';
-					p.querySelector('.mpc-total-box-label').textContent = label;
-					moreEl.appendChild(p);
-				}
+				appendBoxLine(labelExtra, price, 'mpc-total-box-line--service');
 			});
-			var total = transportPrice + china + extrasSum;
-			var label = card.getAttribute('data-transport-label') || card.querySelector('.mpc-result-card-name');
-			if (label && label.nodeName) label = label.textContent;
-			if (labelEl) labelEl.textContent = label || '';
-			if (priceEl) priceEl.textContent = '€ ' + transportPrice;
-			if (totalAmountEl) totalAmountEl.textContent = '€ ' + total;
+
+			var total = transportSubtotal + extrasSum;
+			if (totalAmountEl) totalAmountEl.textContent = '€ ' + Math.round(total);
 		}
 
 		try {
@@ -1608,6 +1751,7 @@
 					if (priceEl) priceEl.textContent = '€ ' + price;
 					updateOrderTotal();
 					updateRailSeaExtrasForContainer(container);
+					syncResultsRailCbmLineVisibility(container);
 				}
 			});
 		});
@@ -1808,12 +1952,17 @@
 					if (group === incotermGroup && incotermGroup) {
 						applyTransportAvailabilityByIncoterm(container);
 						var resultsEl = container.querySelector('.mpc-results');
+						var wasVisible = false;
 						if (resultsEl) {
-							var wasVisible = !resultsEl.classList.contains('mpc-hidden');
+							wasVisible = !resultsEl.classList.contains('mpc-hidden');
 							resultsEl.classList.add('mpc-hidden');
 							if (wasVisible) resetTransportAndTotal(container);
 						}
 						incotermGroup.scrollIntoView({ behavior: 'smooth', block: 'start' });
+						if (wasVisible) {
+							var recalcBtn = container.querySelector('.mpc-btn-calculate');
+							if (recalcBtn) recalcBtn.click();
+						}
 					}
 				});
 			});
@@ -1825,6 +1974,17 @@
 
 		// Total comandă: la click pe Alegeți actualizează caseta din dreapta
 		initTotalBox(container);
+
+		function mpcRecalculateIfResultsVisible() {
+			var r = container.querySelector('.mpc-results');
+			if (!r || r.classList.contains('mpc-hidden')) return;
+			var calcBtn = container.querySelector('.mpc-btn-calculate');
+			if (calcBtn) calcBtn.click();
+		}
+		var delCitySel = container.querySelector('.mpc-delivery-city');
+		var loadCitySel = container.querySelector('.mpc-loading-city');
+		if (delCitySel) delCitySel.addEventListener('change', mpcRecalculateIfResultsVisible);
+		if (loadCitySel) loadCitySel.addEventListener('change', mpcRecalculateIfResultsVisible);
 
 		// Panou Excel sub Total comandă (preview interfață admin – fără upload real pe frontend)
 		initExcelRatesPanel(container);
@@ -1964,8 +2124,8 @@
 				} else if (errors.length === 0) {
 					var resultsEl = container.querySelector('.mpc-results');
 					if (resultsEl) {
-						var incotermBtn = container.querySelector('.mpc-incoterm.mpc-active');
-						var incoterm = (incotermBtn && incotermBtn.getAttribute('data-mode')) || 'exw';
+						var incotermBtn = container.querySelector('.mpc-toggle-group--incoterms .mpc-incoterm.mpc-active');
+						var incoterm = normalizeIncoterm(incotermBtn && incotermBtn.getAttribute('data-mode'));
 						resultsEl.setAttribute('data-incoterm', incoterm);
 						// Placeholder: pune volumul/greutatea din formular în rezultate (până la logica reală)
 						var volVal = '1.00';
@@ -2012,7 +2172,12 @@
 						} catch (eRk) {}
 						var volEl = resultsEl.querySelector('.mpc-results-vol-value');
 						if (volEl) volEl.textContent = volVal;
-						resultsEl.querySelectorAll('.mpc-results-phys-value, .mpc-results-weight-vol-value').forEach(function (el) { el.textContent = volVal; });
+						var physVolEl = resultsEl.querySelector('.mpc-results-phys-value');
+						if (physVolEl) physVolEl.textContent = volVal;
+						var weightVolEl = resultsEl.querySelector('.mpc-results-weight-vol-value');
+						if (weightVolEl) {
+							weightVolEl.textContent = (chargeKg / KG_PER_M3).toFixed(2);
+						}
 						var airW = resultsEl.querySelector('.mpc-results-air-weight-value');
 						if (airW) airW.textContent = weightVal;
 						var railTaxableCbm = Math.max(volNum, weightRealNum / RAIL_SMILE_TIER_KG_PER_M3);
@@ -2030,50 +2195,62 @@
 						var airCard = resultsEl.querySelector('.mpc-result-card--air');
 						var originCityForCalc = loadingCity && loadingCity.value ? loadingCity.value.trim() : '';
 						var destCityForCalc = deliveryCity && deliveryCity.value ? deliveryCity.value.trim() : '';
+						function applyBreakdownToCard(card, result) {
+							if (!card || !result || !result.items) return;
+							var items = result.items;
+							var total = result.total;
+							var roadItem = items.filter(function (it) { return it.key === 'road_ro'; })[0];
+							var roadEur = roadItem ? (roadItem.eur || 0) : 0;
+							card.setAttribute('data-road-price-eur', String(Math.round(roadEur)));
+							card.setAttribute('data-transport-price', String(Math.max(0, Math.round(total - roadEur))));
+							try {
+								card.setAttribute('data-breakdown', JSON.stringify(items));
+							} catch (eBd) {}
+							var pEl = card.querySelector('.mpc-result-card-price');
+							if (pEl) pEl.textContent = total + ' €';
+						}
+
 						if (airCard && typeof computeAirTransportPriceEur === 'function') {
-							var eurPrice = computeAirTransportPriceEur(chargeKg, originCityForCalc, destCityForCalc);
-							if (eurPrice !== null && !isNaN(eurPrice)) {
-								airCard.setAttribute('data-transport-price', eurPrice);
-								var priceEl = airCard.querySelector('.mpc-result-card-price');
-								if (priceEl) priceEl.textContent = eurPrice + ' €';
-							}
+							var airRes = computeAirTransportPriceEur(
+								chargeKg,
+								originCityForCalc,
+								destCityForCalc,
+								weightRealNum,
+								volNum,
+								weightRealNum,
+								incoterm
+							);
+							if (airRes && airRes.items) applyBreakdownToCard(airCard, airRes);
 						}
 
 						var railCard = resultsEl.querySelector('.mpc-result-card--rail');
 						if (railCard && typeof computeRailTransportPriceEur === 'function') {
-							var eurRail = computeRailTransportPriceEur(
+							var railRes = computeRailTransportPriceEur(
 								weightRealNum,
 								volNum,
 								originCityForCalc,
 								destCityForCalc,
 								incoterm
 							);
-							if (eurRail !== null && !isNaN(eurRail)) {
-								railCard.setAttribute('data-transport-price', eurRail);
-								var railPriceEl = railCard.querySelector('.mpc-result-card-price');
-								if (railPriceEl) railPriceEl.textContent = eurRail + ' €';
-							}
+							if (railRes && railRes.items) applyBreakdownToCard(railCard, railRes);
 						}
 						applyTransportAvailabilityByIncoterm(container);
 
 						var seaCard = resultsEl.querySelector('.mpc-result-card--sea');
 						if (seaCard && typeof computeSeaTransportPriceEur === 'function') {
-							var eurSea = computeSeaTransportPriceEur(
+							var seaRes = computeSeaTransportPriceEur(
 								weightRealNum,
 								volNum,
 								originCityForCalc,
 								destCityForCalc,
 								incoterm
 							);
-							if (eurSea !== null && !isNaN(eurSea)) {
-								seaCard.setAttribute('data-transport-price', eurSea);
-								var seaPriceEl = seaCard.querySelector('.mpc-result-card-price');
-								if (seaPriceEl) seaPriceEl.textContent = eurSea + ' €';
-							}
+							if (seaRes && seaRes.items) applyBreakdownToCard(seaCard, seaRes);
 						}
 
 						resetServiceSelections(container);
 						updateRailSeaExtrasForContainer(container);
+						syncResultsRailCbmLineVisibility(container);
 						resultsEl.classList.remove('mpc-hidden');
 						resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 						if (typeof container._mpcUpdateOrderTotal === 'function' && container.querySelector('.mpc-result-card--selected')) {

@@ -3,7 +3,7 @@
  * Plugin Name:       My Plugin
  * Plugin URI:        https://example.com/my-plugin
  * Description:       A WordPress plugin.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Your Name
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'MY_PLUGIN_VERSION', '1.0.0' );
+define( 'MY_PLUGIN_VERSION', '1.1.0' );
 define( 'MY_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'MY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'MY_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );

@@ -116,12 +116,16 @@ function my_plugin_build_order_confirmation_email_html( array $data ) {
 								if ( ! is_array( $line ) ) {
 									continue;
 								}
-								$lbl = isset( $line['label'] ) ? (string) $line['label'] : '';
-								$eur = isset( $line['eur'] ) ? (string) $line['eur'] : '';
+								$lbl     = isset( $line['label'] ) ? (string) $line['label'] : '';
+								$eur     = isset( $line['eur'] ) ? (string) $line['eur'] : '';
+								$explain = isset( $line['explain'] ) ? (string) $line['explain'] : '';
 								if ( '' === $lbl && '' === $eur ) {
 									continue;
 								}
-								echo '<p style="margin:0 0 6px;">' . esc_html( (string) $i ) . '. ' . esc_html( $lbl ) . ': <strong>' . esc_html( $eur ) . '</strong></p>';
+								echo '<p style="margin:0 0 4px;">' . esc_html( (string) $i ) . '. ' . esc_html( $lbl ) . ': <strong>' . esc_html( $eur ) . '</strong></p>';
+								if ( '' !== $explain ) {
+									echo '<p style="margin:0 0 10px 14px;font-size:11px;color:#777777;font-style:italic;line-height:1.45;">' . esc_html( $explain ) . '</p>';
+								}
 								++$i;
 							}
 							if ( $i === 1 ) {
@@ -194,24 +198,49 @@ function my_plugin_get_demo_order_confirmation_data() {
 		'page_url'            => home_url( '/' ),
 		'tarife_lines'        => array(
 			array(
-					'label' => __( 'Transport Internațional (freight) China-România', 'my-plugin' ),
-				'eur'   => '365 Euro',
+				'label'   => __( 'Feroviar China → România (freight)', 'my-plugin' ),
+				'eur'     => '460 Euro',
+				'explain' => __( 'Costul transportului pe calea ferată pe ruta China–România, calculat pe CBM taxabil (max(volum, kg/300)).', 'my-plugin' ),
 			),
 			array(
-				'label' => __( 'Servicii logistice locale CN (EXW)', 'my-plugin' ),
-				'eur'   => '417 Euro',
+				'label'   => __( 'Pick-up factory → terminal China', 'my-plugin' ),
+				'eur'     => '69 Euro',
+				'explain' => __( 'Ridicarea fizică a mărfii din fabrică spre terminalul feroviar de încărcare, tarif pe CBM.', 'my-plugin' ),
 			),
 			array(
-				'label' => __( 'Servicii logistice locale RO — Livrare door to door (TVA nu este inclus în preț)', 'my-plugin' ),
-				'eur'   => '76 Euro',
+				'label'   => __( 'Servicii locale China (handling + B/L)', 'my-plugin' ),
+				'eur'     => '69 Euro',
+				'explain' => __( 'Manipulare în terminal și emiterea documentului de transport (Rail Waybill / B/L).', 'my-plugin' ),
 			),
 			array(
-				'label' => __( 'Perfectare cod EORI (la cerere, TVA nu este inclus în preț)', 'my-plugin' ),
-				'eur'   => '50 Euro',
+				'label'   => __( 'Servicii suplimentare feroviar (cut-off)', 'my-plugin' ),
+				'eur'     => '23 Euro',
+				'explain' => __( 'Taxe suplimentare pentru încadrarea în cut-off-ul de tren și manipulări auxiliare.', 'my-plugin' ),
 			),
 			array(
-				'label' => __( 'Perfectare declarație de import (100 Euro / 2 coduri HS, TVA nu este inclus în preț)', 'my-plugin' ),
-				'eur'   => '60 Euro',
+				'label'   => __( 'Vamă export China (declarație)', 'my-plugin' ),
+				'eur'     => '102 Euro',
+				'explain' => __( 'Declarația vamală de export depusă de agentul vamal în China (necesară la EXW).', 'my-plugin' ),
+			),
+			array(
+				'label'   => __( 'ENS UE (ICS2 R3, obligatoriu)', 'my-plugin' ),
+				'eur'     => '34 Euro',
+				'explain' => __( 'Entry Summary Declaration depusă obligatoriu cu 24h înainte de îmbarcare pentru orice marfă LCL spre UE.', 'my-plugin' ),
+			),
+			array(
+				'label'   => __( 'Tranzit vamal T1', 'my-plugin' ),
+				'eur'     => '150 Euro',
+				'explain' => __( 'Document vamal de tranzit care însoțește marfa sub supraveghere de la punctul de intrare în UE până la biroul vamal de destinație.', 'my-plugin' ),
+			),
+			array(
+				'label'   => __( 'Rutier Constanța → adresă livrare', 'my-plugin' ),
+				'eur'     => '157 Euro',
+				'explain' => __( 'Transport rutier intern în România, tarif din tabelul FTL pe praguri Full Truck (≥22t) / Sprinter (≥1.2t) / CO-LOAD.', 'my-plugin' ),
+			),
+			array(
+				'label'   => __( 'Perfectare declarație de import (100 Euro / 2 coduri HS)', 'my-plugin' ),
+				'eur'     => '100 Euro',
+				'explain' => __( 'Declarația vamală de import depusă în UE, calculată pe coduri HS.', 'my-plugin' ),
 			),
 		),
 	);
